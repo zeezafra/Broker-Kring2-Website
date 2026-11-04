@@ -1,0 +1,12 @@
+node_modules/
+.next/
+dist/
+build/
+.vercel/
+*.tsbuildinfo
+.DS_Store
+# Prisma 7 generated client (rebuilt by `prisma generate` on install)
+backend/src/generated/
+# Secrets: ignore every env file except the example
+.env*
+!.env.example

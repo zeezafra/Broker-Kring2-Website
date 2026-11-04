@@ -1,0 +1,74 @@
+// Phase 1: connection. Phase 3: Property. Phase 4: AdminUser. Phase 10 adds Inquiry.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ListingType {
+  SALE // shown under "Buy"
+  RENT // shown under "Rent"; price is the monthly rent
+}
+
+// Values mirror the "Property Type" dropdown in the HTML. The broker still has to confirm that list;
+// adding a value later is a one-line enum change plus a migration.
+enum PropertyType {
+  HOUSE_AND_LOT
+  CONDOMINIUM
+  TOWNHOUSE
+  COMMERCIAL
+}
+
+enum PropertyStatus {
+  DRAFT // admin-only, never returned by the public API
+  AVAILABLE
+  RESERVED
+  SOLD
+  RENTED
+}
+
+model Property {
+  id            Int            @id @default(autoincrement())
+  title         String
+  description   String?
+  listingType   ListingType    @default(SALE)
+  propertyType  PropertyType
+  status        PropertyStatus @default(DRAFT)
+
+  // Philippine peso. For RENT listings this is the monthly rent.
+  price         Decimal        @db.Decimal(14, 2)
+
+  city          String?
+  address       String?
+  bedrooms      Int?
+  bathrooms     Int?
+  floorAreaSqm  Float?
+  lotAreaSqm    Float?
+
+  // Ordered image URLs; the first one is the cover photo. Phase 5 fills this from Cloudinary.
+  images        String[]
+
+  featured      Boolean        @default(false)
+  // True for the seeded stand-in listings. The site labels these until real inventory replaces them.
+  isPlaceholder Boolean        @default(false)
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([status, listingType])
+  @@index([featured])
+}
+
+// Staff who can log in to /admin (Zee and Marie Chris). Created by the seed script from env vars;
+// there is no public sign-up. Only a bcrypt hash is stored, never the password.
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique // stored lowercase
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
