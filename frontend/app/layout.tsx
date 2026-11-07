@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
-import { Allura, DM_Sans, Playfair_Display } from "next/font/google";
+import { Allura, Playfair_Display } from "next/font/google";
+import localFont from "next/font/local";
 import { defaultOgImage, siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -9,10 +10,18 @@ const playfair = Playfair_Display({
   weight: ["500", "600", "700"],
   variable: "--font-playfair",
 });
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+// DM Sans is self-hosted from @fontsource/dm-sans: next/font/google@14.2.x crashes on DM Sans
+// ("Cannot read properties of null (reading '1')") because Google now serves its files without a
+// .woff2 extension. Same family, same weights, so the look is unchanged.
+const dmSans = localFont({
+  src: [
+    { path: "../node_modules/@fontsource/dm-sans/files/dm-sans-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../node_modules/@fontsource/dm-sans/files/dm-sans-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../node_modules/@fontsource/dm-sans/files/dm-sans-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../node_modules/@fontsource/dm-sans/files/dm-sans-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
   variable: "--font-dm-sans",
+  display: "swap",
 });
 const allura = Allura({
   subsets: ["latin"],
