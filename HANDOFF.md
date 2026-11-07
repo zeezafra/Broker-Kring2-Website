@@ -1,5 +1,18 @@
 # HANDOFF — Cebu Properties by MCT (Marie Chris L. Tagsip, REB, REA)
 
+## After Phase 13 — Frontend moved to Next.js 14.2.35 (requested by Zee, 2026-11-07, to match the Zee Zafra Properties project)
+Versions now (`frontend/package.json`): next 14.2.35 (exact), react/react-dom ^18.3.1, tailwindcss ^3.4.7 + postcss + autoprefixer, typescript ^5.5.4, eslint ^8.57 + eslint-config-next 14.2.35, sonner ^2.0.7. Before: Next 16.4.3, React 19.3.0, Tailwind 4. The backend is untouched. `package-lock.json` was regenerated.
+Changes (all in `frontend/`):
+- `next.config.ts` -> `next.config.mjs` (Next 14 cannot read .ts configs). Kept the `/api/*` rewrite to Render. REMOVED `cacheComponents`, `partialPrefetching` and the Turbopack/Tailwind loader (Next 16-only).
+- `proxy.ts` -> `middleware.ts` (function renamed `middleware`; same /admin cookie gate and matcher).
+- Tailwind 4 -> 3: new `tailwind.config.js` (same colors cream/gold/gold-dark/ink/muted/sage, `shadow-card`, serif/sans fonts, borders default to currentColor as in v4) and `postcss.config.js`; `app/globals.css` starts with `@tailwind base/components/utilities` and the old `@theme static` tokens are now plain `:root` variables (same names). One appended rule keeps placeholder text the same colour as before.
+- ESLint: `eslint.config.mjs` -> `.eslintrc.json` (`next/core-web-vitals`); `npm run lint` is `next lint`.
+- Types: `PageProps<>`/`LayoutProps<>` replaced with plain types; `params` and `searchParams` are plain objects in Next 14 (no `await`) in `app/properties/page.tsx`, `app/properties/[id]/page.tsx`, `app/admin/properties/[id]/page.tsx`, both layouts. `RawParams` is now exported from `lib/search.ts`. `tsconfig.json` got `jsx: preserve` from Next 14.
+- `app/page.tsx` and `app/sitemap.ts` got `export const dynamic = "force-dynamic"`. Reason: Next 14 prerenders at build time, and if the Render API is asleep during the Vercel build the home page would show "Listings are unavailable" until it revalidated. API fetches stay cached 60 s (sitemap 1 h).
+Verified (production `next build` of a test copy with real fonts via @fontsource, headless Chromium): `tsc` clean, `next lint` clean, build passes (17 pages). Pixel-compared against the Next 16 build at 360 and 1280 px: home, about, contact, sell, /properties (+ rent tab), a detail page, admin login are identical (with and without listings, using a mock API). /admin redirects to login without a cookie; sitemap and robots work; modal, menu, sticky header and the overflow guard behave as before.
+NOT verified: the logged-in admin screens (login, add/edit listing, inquiries, Cloudinary upload) were only type-checked, not run; a real Vercel build; the real fonts through `next/font/google` (test used local copies of the same fonts); the Render API. Next 14 gives `/properties/<missing id>` a 200 page with noindex (same soft 404 as before).
+Going back to Next 16: use `tagsip-phase13-logo-and-overflow-guard.zip` (the previous zip).
+
 ## After Phase 13 — Logo fix (requested by Zee, 2026-11-07)
 1. New house icon (`components/Header.tsx`, inline SVG, same gold line style): pitched roof with a small chimney, walls with rounded base corners, arched door with a knob. Replaces the plain house-with-center-line icon. Only the header uses it (the footer has no logo).
 2. Phones (max-width 440px): the logo is now two lines, "Cebu Properties" over a small gold "BY MCT" (`app/globals.css`, the rule that used to hide `.brand-by`). Wider screens still show one line "Cebu Properties by MCT". The text is the same on every screen; only the layout changes.
@@ -391,7 +404,7 @@ PRC Lic. No. 0036820, DHSUD Reg. No. R7-B-06/26-8696, phone, email (read from a 
 - Real web fonts: `next/font/google` can't download in the build sandbox, so the final layout was type-checked and linted but not built here. Tests used the same fallback fonts as the original HTML. Check Playfair Display, DM Sans and Allura render on the first Vercel build.
 - Unsplash photos (listing cards, hero and banner backgrounds) are blocked in the sandbox, so they were not seen rendering; they use the same URLs as the original HTML.
 - `prisma generate` and the DB connection are still unverified (see Phase 1); no Render or Vercel deploy yet.
-- Tailwind 4 runs only under Turbopack (Next 16 default); a `next build --webpack` build will produce unstyled CSS.
+- (Old note, obsolete since the Next 14 move: Tailwind 4 ran only under Turbopack. Tailwind is now 3 and builds with the normal webpack pipeline.)
 
 ## Observations (not changed, per "port, don't redesign")
 - Placeholder cards look like real listings on the page; Phase 3 adds the placeholder flag and label.

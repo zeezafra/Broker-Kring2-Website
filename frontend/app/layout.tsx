@@ -43,7 +43,7 @@ export const viewport: Viewport = {
   themeColor: "#FBF7F1",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${playfair.variable} ${dmSans.variable} ${allura.variable}`}>
       <body>

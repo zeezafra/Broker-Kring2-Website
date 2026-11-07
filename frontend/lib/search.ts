@@ -102,7 +102,7 @@ export const EMPTY_SEARCH: SearchState = {
 
 const MAX_PRICE = 999_999_999_999; // same ceiling the admin form and API enforce
 
-type RawParams = Record<string, string | string[] | undefined>;
+export type RawParams = Record<string, string | string[] | undefined>;
 
 function first(v: string | string[] | undefined): string {
   return (Array.isArray(v) ? v[0] : v) ?? "";

@@ -27,6 +27,9 @@ async function allListings(): Promise<ApiProperty[]> {
   return out.filter((p) => !p.isPlaceholder);
 }
 
+// Built per request (listings come from the API, which may be asleep at build time); API fetches are cached for 1 h.
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const pages = ["/", "/properties", "/about", "/contact", ...(sellPage.approved ? ["/sell"] : [])];
   const listings = await allListings();

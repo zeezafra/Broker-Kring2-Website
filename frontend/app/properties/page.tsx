@@ -9,12 +9,15 @@ import {
   buildHref,
   hasActiveFilters,
   parseSearch,
+  type RawParams,
   priceLabel,
   AREA_OPTIONS,
   TYPE_OPTIONS,
   type ListingFilter,
   type SearchState,
 } from "@/lib/search";
+
+type SearchParams = RawParams;
 
 export const metadata: Metadata = {
   title: "Properties | Cebu Properties by MCT",
@@ -71,8 +74,8 @@ function PageHead({ title, children }: { title: string; children?: React.ReactNo
   );
 }
 
-async function Listings({ searchParams }: { searchParams: PageProps<"/properties">["searchParams"] }) {
-  const state = parseSearch(await searchParams);
+async function Listings({ searchParams }: { searchParams: SearchParams }) {
+  const state = parseSearch(searchParams);
   const { listing, page } = state;
   const filtered = hasActiveFilters(state);
   const [result, locations] = await Promise.all([getProperties(state), getLocations()]);
@@ -165,7 +168,7 @@ async function Listings({ searchParams }: { searchParams: PageProps<"/properties
   );
 }
 
-export default function PropertiesPage(props: PageProps<"/properties">) {
+export default function PropertiesPage(props: { searchParams: SearchParams }) {
   return (
     <SiteShell>
       <section className="listing-page">

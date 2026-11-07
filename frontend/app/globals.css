@@ -1,7 +1,9 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Design tokens, taken from the original cebu-properties-by-mct.html :root block. */
-@theme static {
+:root {
   --color-cream: #FBF7F1;
   --color-gold: #B98A4A;
   --color-gold-dark: #9b7138;
@@ -455,3 +457,6 @@ nav a{min-height:48px;display:flex;align-items:center}
    never creates a scroll container. text-size-adjust stops phone browsers from inflating text sizes. */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden}
 body{overflow-x:clip}
+
+/* Tailwind 4 -> 3 parity: v4 draws placeholders as the text colour at 50%; v3 uses a fixed light grey. */
+input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in srgb,currentColor 50%,transparent)}

@@ -10,10 +10,9 @@ import { defaultOgImage } from "@/lib/site";
 
 const SITE = "Cebu Properties by MCT";
 
-// params is runtime data, so it is awaited inside <Suspense> / generateMetadata (required with cacheComponents).
 // fetch() is memoized, so the metadata and the page share one API call.
-export async function generateMetadata({ params }: PageProps<"/properties/[id]">): Promise<Metadata> {
-  const { id } = await params;
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const { id } = params;
   const result = await getProperty(id);
   if (!result.ok) return { title: `${result.notFound ? "Property not found" : "Property"} | ${SITE}` };
 
@@ -40,8 +39,8 @@ export async function generateMetadata({ params }: PageProps<"/properties/[id]">
   };
 }
 
-async function Detail({ params }: { params: PageProps<"/properties/[id]">["params"] }) {
-  const { id } = await params;
+async function Detail({ params }: { params: { id: string } }) {
+  const { id } = params;
   const result = await getProperty(id);
 
   if (!result.ok) {
@@ -76,7 +75,7 @@ function DetailSkeleton() {
   );
 }
 
-export default function PropertyPage(props: PageProps<"/properties/[id]">) {
+export default function PropertyPage(props: { params: { id: string } }) {
   return (
     <SiteShell>
       <Suspense fallback={<DetailSkeleton />}>

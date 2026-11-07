@@ -2,13 +2,12 @@ import { Suspense } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import EditPropertyLoader from "@/components/admin/EditPropertyLoader";
 
-// params is runtime data, so it is awaited inside <Suspense> (required with cacheComponents).
-async function EditContent({ params }: { params: PageProps<"/admin/properties/[id]">["params"] }) {
-  const { id } = await params;
+function EditContent({ params }: { params: { id: string } }) {
+  const { id } = params;
   return <EditPropertyLoader id={id} />;
 }
 
-export default function EditPropertyPage(props: PageProps<"/admin/properties/[id]">) {
+export default function EditPropertyPage(props: { params: { id: string } }) {
   return (
     <AdminShell>
       <Suspense fallback={<p className="text-muted">Loading listing…</p>}>
