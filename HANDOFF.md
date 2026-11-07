@@ -1,5 +1,10 @@
 # HANDOFF — Cebu Properties by MCT (Marie Chris L. Tagsip, REB, REA)
 
+## After Phase 13 — Logo fix (requested by Zee, 2026-11-07)
+1. New house icon (`components/Header.tsx`, inline SVG, same gold line style): pitched roof with a small chimney, walls with rounded base corners, arched door with a knob. Replaces the plain house-with-center-line icon. Only the header uses it (the footer has no logo).
+2. Phones (max-width 440px): the logo is now two lines, "Cebu Properties" over a small gold "BY MCT" (`app/globals.css`, the rule that used to hide `.brand-by`). Wider screens still show one line "Cebu Properties by MCT". The text is the same on every screen; only the layout changes.
+Verified (production build of a test copy, real fonts, headless Chromium): header at 320, 360, 390 and 1280 px, nothing clipped, no horizontal overflow, the Inquire Now button and menu toggle keep their space. NOT verified: on a real phone. Favicon (`app/favicon.ico`) was not changed and still shows the old look.
+
 ## After Phase 13 — Mobile horizontal-scroll guard (requested by Zee, 2026-11-07)
 Symptom (Zee's phone screenshot): on the home page the search card, "View All Properties" arrow and the Inquire Now button run past the right edge; the page scrolls sideways. Layout width on the phone is about 383 CSS px on a 360 px screen.
 Cause: NOT FOUND. A real Chromium sweep (real Playfair/DM Sans/Allura via @fontsource, API unreachable so the "Listings are unavailable" state shows, 5 pages x 6 widths 320-412) found no overflowing element and no sideways scroll. Something on Zee's phone differs (browser, system font size, or an in-app browser such as Messenger's).

@@ -52,8 +52,11 @@ export default function Header() {
       <div className="wrap nav">
         <Link className="brand" href="/" aria-label="Cebu Properties by MCT home">
           <svg viewBox="0 0 48 48" aria-hidden="true">
-            <path d="M5 21 24 5l19 16v22H29V29H19v14H5z" />
-            <path d="M24 5v10" />
+            <path d="M3.5 22.5 24 5.5l20.5 17" />
+            <path d="M9 19.5V41a2.5 2.5 0 0 0 2.5 2.5h25A2.5 2.5 0 0 0 39 41V19.5" />
+            <path d="M34 13.5V8h5v9.5" />
+            <path d="M19 43.5V32a5 5 0 0 1 10 0v11.5" />
+            <circle cx="26.2" cy="37.5" r=".9" />
           </svg>
           <span>
             Cebu Properties<span className="brand-by"> by MCT</span>

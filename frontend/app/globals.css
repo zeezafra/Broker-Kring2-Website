@@ -136,8 +136,8 @@ nav a{min-height:48px;display:flex;align-items:center}
 .features{font-size:12.5px}.features span{padding:0 8px}
 }
 
-/* Phones: drop the " by MCT" suffix visually (full name stays in the link's aria-label) so the brand never truncates. */
-@media(max-width:440px){.brand-by{display:none}}
+/* Phones: two-line logo. "Cebu Properties" on top, a small "by MCT" line under it, so the full name always shows. */
+@media(max-width:440px){.brand>span{display:flex;flex-direction:column;justify-content:center;line-height:1.1}.brand .brand-by{display:block;font:600 10px/1 var(--font-sans);letter-spacing:.22em;text-transform:uppercase;color:var(--color-gold-dark);margin-top:4px}}
 @media(max-width:340px){.wrap{width:calc(100% - 32px)}.brand{gap:5px}.brand svg{width:24px;height:24px}.brand span{font-size:13px}.nav{gap:4px}.nav>.gold-btn{padding:0 10px;font-size:12px}.menu-toggle{width:40px;margin-right:-6px}}
 @media(max-width:340px){.cards{margin:0 -16px;padding:6px 16px 26px;scroll-padding-left:16px}}
 /* Search: give "Property Type" the wider column so no label is cut off */
