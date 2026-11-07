@@ -6,6 +6,7 @@ import PropertyDetail from "@/components/PropertyDetail";
 import SiteShell from "@/components/SiteShell";
 import { PROPERTY_TYPE_LABELS } from "@/lib/admin-api";
 import { cardImage, formatPrice, getProperty, locationLine } from "@/lib/public-api";
+import { defaultOgImage } from "@/lib/site";
 
 const SITE = "Cebu Properties by MCT";
 
@@ -24,10 +25,17 @@ export async function generateMetadata({ params }: PageProps<"/properties/[id]">
   return {
     title: `${p.title} | ${SITE}`,
     description,
+    alternates: { canonical: `/properties/${p.id}` },
+    // Sample listings are not real inventory: keep them out of search results.
+    ...(p.isPlaceholder ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
+      type: "website",
+      siteName: SITE,
+      locale: "en_PH",
       title: p.title,
       description,
-      ...(p.images[0] ? { images: [{ url: cardImage(p.images[0], 1200) }] } : {}),
+      url: `/properties/${p.id}`,
+      ...(p.images[0] ? { images: [{ url: cardImage(p.images[0], 1200) }] } : { images: [defaultOgImage] }),
     },
   };
 }

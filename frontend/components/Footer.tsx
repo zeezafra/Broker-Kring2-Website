@@ -1,3 +1,6 @@
+import { broker } from "@/lib/broker";
+
+// Phase 9: credentials and the trust line come from lib/broker.ts.
 export default function Footer() {
   return (
     <footer id="contact">
@@ -5,17 +8,18 @@ export default function Footer() {
         <div className="footer-item">
           <div className="footer-icon">▤</div>
           <div className="footer-label">
-            PRC Lic. No.<strong>0036820</strong>
+            PRC Lic. No.<strong>{broker.prcLicenseNo}</strong>
           </div>
         </div>
         <div className="footer-item">
           <div className="footer-icon">⌂</div>
           <div className="footer-label">
-            DHSUD Reg. No.<strong>R7-B-06/26-8696</strong>
+            DHSUD Reg. No.<strong>{broker.dhsudRegNo}</strong>
           </div>
         </div>
         <div className="footer-trust">
-          Your Trusted Partner<small>IN REAL ESTATE</small>
+          {broker.trust.lead}
+          <small>{broker.trust.small}</small>
         </div>
       </div>
     </footer>

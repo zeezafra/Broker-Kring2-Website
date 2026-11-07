@@ -1,5 +1,174 @@
 # HANDOFF — Cebu Properties by MCT (Marie Chris L. Tagsip, REB, REA)
 
+## After Phase 13 — Resend inquiry emails + Sell nav link (requested by Zee, 2026-11-07)
+1. Sell nav: the header "Sell" link now ALWAYS goes to `/sell` (`components/Header.tsx`). It used to go to `/#contact` (the footer credentials bar) until `sellPage.approved` was true, so clicking Sell showed nothing. `approved` still controls the "Draft wording" note, `noindex` and the sitemap entry, so nothing is claimed as broker-approved. Phase 0 decision ("Sell nav stays as in the HTML") was overridden by Zee.
+2. Email on every new inquiry via Resend (`backend/src/notify.ts`, new; called from `src/inquiries.ts` right after the inquiry is saved and the 201 is sent; `src/config.ts` only adds startup warnings). Uses Resend's REST API through fetch: NO new dependency, NO migration. Failures are caught and logged (HTTP status + Resend's message, never visitor data); the lead is always saved first. Visitor text is HTML-escaped; Reply-To is the visitor's email. Honeypot hits and duplicates send nothing.
+Render env vars: `RESEND_API_KEY`, `INQUIRY_NOTIFY_TO` (comma-separated, e.g. Marie Chris + Zee), `INQUIRY_FROM` (e.g. `Cebu Properties by MCT <inquiries@yourdomain.com>`). Without key + recipients nothing is sent.
+LIMIT: without a verified domain in Resend, only the test sender `onboarding@resend.dev` works and it delivers ONLY to the Resend account owner's own email. Domain is not chosen yet, so for now set INQUIRY_NOTIFY_TO to the email used to sign up to Resend. Add the domain DNS records in Resend before emailing Marie Chris's Gmail.
+Verified: notifier unit-tested with a mocked fetch (recipients, reply_to, subject line-break stripping, script tag escaped, no key = no call, HTTP 403 logged not thrown). NOT verified: `tsc` on the backend (no node_modules/Prisma client here), a real Resend send, the browser view of the header link.
+
+## After Phase 13 — About page UI/UX redesign (requested by Zee, 2026-11-06)
+Scope: /about only. The homepage broker section, /contact, /sell, footer and `components/BrokerParts.tsx` are NOT touched.
+What changed:
+- `components/AboutParts.tsx` (NEW) — `AboutName` (script name + large surname, ", REB, REA" shown smaller; still ONE h1), `AboutPositioning`, `AboutBio`, `AboutCredentials`, `AboutContact`. All values read from `lib/broker.ts`.
+- `app/about/page.tsx` — new layout (portrait + brand caption on the left, sticky on desktop; intro, About, Professional credentials, Get in touch on the right). Heading order is now h1 > h2 (it was h1 > h3). Portrait still uses `BrokerPortrait` with `priority`.
+- `lib/broker.ts` — new OPTIONAL `positioning?: string`. When not set, /about shows the two tagline lines from her card joined together ("Helping you find the right property. Turning your real estate goals into reality."). Set it only with her approval.
+- `app/globals.css` — one block appended at the end ("About page redesign"), everything scoped under `.about-page`/`.ab-*`. The old `.about-h`, `.about-bio`, `.about-creds`, `.bio-placeholder` rules are now unused by /about (still used or harmless: `.bio-placeholder` is still used by /sell; left in place).
+- `scripts/launch-check.mjs` — only the wording of the empty-bio warning.
+Bio: still `broker.bio` (string[] or null), one paragraph per string; first paragraph is shown larger as a lead. While null it shows a plain gold-ruled line "Marie Chris's personal introduction will appear here." (no dashed box, no invented text).
+Contact: phone (`tel:`), email (`mailto:`) and Facebook (new tab, `noopener noreferrer`, "(opens in a new tab)" for screen readers) were already links; they are now full-width rows with label, hover and focus-visible states. Location is plain text. Only ONE phone number exists in `lib/broker.ts`; a second number would need a data change first.
+Contrast: gold #B98A4A on cream is ~2.9:1, so text that was gold now uses #9b7138 (script name, large) and #85602a (small labels); grey labels use #5f5d57 (about 6:1). Icons and borders keep the brand gold.
+Credentials cards also show the full agency names (Professional Regulation Commission; Department of Human Settlements and Urban Development). Those are the public names of the agencies, not claims about her; remove them in `AboutParts.tsx` if she prefers.
+Verified (sandbox, real components rendered with react-dom/server + the real CSS, headless Chromium, font stand-ins, a TEST-ONLY sample bio that is not in the project): no horizontal overflow at 1440, 1024, 768, 390, 320 px (empty bio and sample bio); links have the right href/target/rel; tab order phone > email > Facebook; focus ring visible; one h1, h2s in order.
+NOT verified: `next build`/`tsc` under the project's strict config (no node_modules here), real fonts (Playfair, DM Sans, Allura; the script-name width and the surname size were checked with fallback fonts), Lighthouse, a real deploy.
+Still awaiting the broker: bio text, real Facebook URL (link still goes to facebook.com), approval of the positioning line, confirmation of PRC/DHSUD/phone/email.
+
+## After Phase 13 — North / South Cebu in the Location dropdowns (requested by Zee, 2026-11-05)
+Why: the Location dropdown only listed cities typed into listings (so just "Cebu"). Zee wants North and South Cebu, chosen by the admin per listing (e.g. Carcar = South).
+Design: new OPTIONAL `Property.area` (enum `CebuArea` NORTH|SOUTH). The admin picks it on each listing; nothing is guessed from the city name, so no town-to-region list was invented. Empty = not set (fine for Cebu City / Metro Cebu). The two options "North Cebu" / "South Cebu" are fixed and always shown in the hero and /properties Location dropdowns (group "Area"), followed by the cities from listings (group "City"). One dropdown still holds one choice (an area OR a city).
+Files:
+- `backend/prisma/schema.prisma` — enum `CebuArea`, `Property.area CebuArea?`
+- `backend/prisma/migrations/20261105020000_add_property_area/migration.sql` — HAND-WRITTEN (CREATE TYPE + ADD COLUMN); run `npx prisma migrate deploy`, then `npx prisma generate`
+- `backend/src/propertyInput.ts` — validates `area` (NORTH, SOUTH, ""/null clears)
+- `backend/src/properties.ts` — `GET /api/properties?area=NORTH|SOUTH` (400 on bad value)
+- `frontend/lib/search.ts` — `AREA_OPTIONS`, `area` in SearchState / URL (`?area=south`), `locationValue` / `splitLocation` helpers, `heroHref` takes `location`; an area replaces a city if a URL has both
+- `frontend/components/Hero.tsx`, `PropertyFilters.tsx` — Location select now `name="location"` with Area + City groups
+- `frontend/app/properties/page.tsx` — removable "North Cebu" / "South Cebu" chip
+- `frontend/lib/admin-api.ts`, `components/admin/PropertyForm.tsx` — "Area of Cebu" select on the listing form (Address now spans both columns)
+TO DO AFTER DEPLOY: existing listings have no area. Edit each one in /admin and set North/South, or searching "South Cebu" returns nothing.
+Verified: `lib/search.ts` typechecked (strict) and 15 behavior checks pass (hero hrefs, URL round trip, API param, bad values). All edited files parse. NOT verified: Prisma migration against a real Postgres, `prisma generate`, full `next build`, browser check (no node_modules / no network in the sandbox this time).
+Not done on purpose: area is not shown on listing cards or the detail page (would change the ported card text); say so if you want "Carcar, South Cebu" there.
+
+## After Phase 13 — filter changes requested by Zee (2026-11-05)
+1. /properties: the Min price / Max price boxes are replaced by ONE "Price range" dropdown (`components/PropertyFilters.tsx`, `lib/search.ts`). Buy/All use the hero's purchase bands (Below ₱5M, ₱5M–10M, ₱10M–20M, Above ₱20M); Rent uses monthly-rent bands (`RENT_PRICE_BANDS`: below ₱15,000, 15–30k, 30–60k, above ₱60,000). THE RENT EDGES ARE MY PROPOSAL, edit the numbers in `lib/search.ts`. URL params stay `minPrice`/`maxPrice` (backend unchanged), so old links work; a range that matches no band shows as a "Custom: ..." option.
+2. New property type "Lot": enum value `LOT` (`schema.prisma`), migration `20261105010000_add_lot_property_type` (ALTER TYPE ... ADD VALUE, hand-written; run `npx prisma migrate deploy`, then `npx prisma generate`), label in `lib/admin-api.ts` (admin form picks it up automatically), filter option in `lib/search.ts` (hero + /properties), API comment. Verified locally: API filter `propertyType=LOT`, hero and /properties dropdowns.
+Tested in the font-stubbed test build with headless Chromium: dropdown options, filtering by Lot and by a band, selection kept after reload, Custom option, no horizontal scroll at 390px.
+
+
+## Phase 13 — Deploy hardening, SEO & polish (CODE DONE in sandbox, 2026-11-05; real deploy still unconfirmed)
+Status: backend typechecked and runtime-tested (headers, CORS, 404, 413, bad JSON); frontend typechecked, linted (only the old PropertyList.tsx error) and built + browser-tested in a font-stubbed test copy against local Postgres 16. Real fonts and real Render/Vercel deploy NOT verified.
+Backend: `src/config.ts` (origins trimmed, trailing slash removed; `checkEnvironment()` warns at startup about missing DATABASE_URL/JWT_SECRET, localhost or http in CORS_ORIGINS in production, missing Cloudinary vars, leftover ADMIN*_PASSWORD), `src/index.ts` (security headers, 100kb JSON limit, no-store on /api/auth + /api/admin, JSON 404 for unknown /api paths, 4xx body errors no longer become 500).
+Frontend: `lib/site.ts` (NEXT_PUBLIC_SITE_URL -> VERCEL_PROJECT_PRODUCTION_URL -> localhost), `app/layout.tsx` (metadataBase, default description, Open Graph, twitter card; default share image = next-chapter.jpg), `app/robots.ts` (disallows /admin, /api/, /status), `app/sitemap.ts` (pages + every non-placeholder listing, hourly; /sell only once approved), canonical on home/about/contact/sell/detail, sample listings' detail pages are noindex, `/status` noindex, `components/BrokerJsonLd.tsx` (RealEstateAgent from lib/broker.ts only), `app/not-found.tsx`, `app/error.tsx`, skip link + `id="main"`, focus-visible rings, InquiryModal focus trap/return, sticky close button, short modal entrance, reduced-motion rule, /about portrait `priority`, detail skeleton min-height. All CSS is an appended Phase 13 block.
+`scripts/launch-check.mjs` (run `node scripts/launch-check.mjs` from the project root): fails on wrong PRC/DHSUD/phone/email, Merlinda or Zee brand data, secrets or .env files; lists what still needs confirming. Currently PASS.
+Lighthouse (local, mobile, stubbed fonts, external images blocked): perf 92-99, a11y 94-98, best-practices 96-100, SEO 91-100. Detail page SEO 91 is Lighthouse not seeing the streamed meta description (Googlebot UA gets it in <head>, checked with curl). Detail CLS 0.15 reported by Lighthouse on the hidden modal; NOT reproduced in a throttled real browser (0 shifts). Baseline check done: the same 0.154 appears WITHOUT the Phase 13 CSS, so it is pre-existing (not a Phase 13 regression); likely a Lighthouse/streaming artifact on the hidden modal. Re-measure on the real Vercel deploy.
+Open observations (not changed, design): white text on the gold buttons/price badge fails WCAG contrast (about 3:1); heading order skips h2 on /properties and /about; the detail 404 is still a soft 404 (200 + noindex).
+Launch checklist (Zee/broker): confirm PRC, DHSUD, phone, email; real Facebook URL; bio; approve /sell wording and the consent text; replace placeholder listings; set NEXT_PUBLIC_SITE_URL (Vercel) and CORS_ORIGINS (Render, https, no localhost); blank ADMIN*_PASSWORD after seeding. COSTS: Vercel Hobby is non-commercial only (a client site paid for needs Pro); Render free Postgres expires after 30 days (+14 days grace, then deleted) and free web services sleep after 15 min (~1 min cold start), so use paid Render for production. Domain not chosen yet.
+
+
+## Phase 12 — Contact page (DONE in sandbox, 2026-11-05; real deploy still unconfirmed)
+Status: code complete, typechecked, linted, built and browser-tested (local Postgres 16 + headless Chromium). No backend or migration change in this phase.
+What was added:
+- `/contact` (`app/contact/page.tsx`): headline, intro, the same phone / email / location / Facebook list as /about (`BrokerContactList`, all from `lib/broker.ts`), and an inquiry form. Wording in `lib/contact.ts` (no office hours, response times or office address: none were supplied).
+- `components/ContactForm.tsx`: name, phone, email, message, same consent line + honeypot as the modal; posts to `/api/inquiries` WITHOUT `service`, so it is saved as a GENERAL inquiry (shows as "General inquiry" in the inbox).
+- Header: Contact now links to `/contact` (desktop + mobile menu) and is underlined on that page.
+- The page reuses the `/sell` layout classes (`sell`, `sell-grid`, `sell-card`, `sell-sent`) so the two pages match; one tiny CSS rule added at the end of `globals.css`.
+- A visible dashed "Placeholder" note shows on /contact while `broker.facebook.isPlaceholder` is true (the Facebook link still goes to facebook.com).
+DECISIONS: the footer keeps `id="contact"` and the Sell nav still points at `/#contact` until `sellPage.approved` is true (Phase 0 decision), so the "retire /#contact" idea from the Phase 11 notes was NOT done. The footer design (credentials bar only) was not changed: adding phone/email there would be a redesign, not a port.
+Verified: nav click from home lands on /contact; tel: and mailto: links; required fields block; bad email shows the server message and keeps typed values; success view; "Send another" resets; header Inquire modal still works; no horizontal scroll at 390 and 320 px; mobile menu Contact link; new inquiry appears in /admin/inquiries as General; no page errors.
+NOT verified: real Render/Vercel deploy; real fonts (sandbox test copy needs `:root{--font-serif:Georgia,serif}` or every h1 shows at 16px); phone and email were read from a card image and the broker must confirm them before launch, because /contact now shows them prominently.
+Awaiting broker: phone, email, Facebook page URL (then set `facebook.isPlaceholder` to false and the note disappears), consent wording, `/sell` copy.
+
+Next: Phase 13 (polish and launch checklist): confirm costs and domain, real Facebook URL, sticky modal close button on small phones, `approved` flags, sitemap/robots, metadata, real fonts check, replace seeded placeholder listings, final deploy test.
+
+## Phase 11 — Sell & Appraisal (DONE in sandbox, 2026-11-05; real deploy still unconfirmed)
+Status: code complete, typechecked, built, and browser-tested the same way as Phase 10 (local Postgres 16, headless Chromium). The "Sell" link in the header still points at `/#contact` ON PURPOSE (Phase 0 decision) until the broker approves the page wording.
+What was added:
+- Backend: migration `20261105000000_add_sell_appraisal` (enum value `SELL_APPRAISAL` on `InquiryType`, new enum `InquiryService` SELL|APPRAISAL, nullable `Inquiry.service` + `Inquiry.propertyLocation`). `POST /api/inquiries` accepts optional `service` + `propertyLocation` (location required 3-150 chars when `service` is set; `propertyId` is ignored on sell inquiries; duplicate check includes `service`). `GET /api/admin/inquiries` takes `type=GENERAL|LISTING|SELL_APPRAISAL` (tab counts respect it).
+- Frontend: `/sell` page (`app/sell/page.tsx`), `components/SellForm.tsx` (radio: Sell / Appraisal, location, name, phone, email, message, same consent line + honeypot as the modal), copy in `lib/sell.ts`, Phase 11 block at the end of `globals.css`. Inbox: "Type" filter, "Wants to sell" / "Wants an appraisal" badge and a "Property location" line.
+- `lib/sell.ts` has ONE switch, `approved: false`. While false: visible "Draft wording" note, `noindex` meta, header Sell link unchanged. To publish: edit the wording if the broker supplied her own, set `approved: true` (note disappears, noindex removed, header Sell goes to `/sell`).
+Verified: curl (sell ok; missing location -> clear 400; bad service -> 400; propertyId ignored; duplicate resend saved once; admin type filter + bad type 400); browser (radio required, server error keeps typed values and the chosen option, success view, "Send another" resets, header Inquire modal still works on /sell, Sell nav underline on /sell, no horizontal scroll at 390 and 320 px, inbox badges, Type filter and tab counts, no page errors).
+SANDBOX GOTCHA (not an app bug): in the font-stubbed test copy, `--font-serif` is invalid because `--font-playfair` does not exist, so EVERY h1 shows at 16px. Add `:root{--font-serif:Georgia,serif}` to the test copy only. Do not use `pkill -f` in a command (it kills the shell itself); kill by PID. Postgres must be restarted each session (`service postgresql start`).
+NOT verified: real Render/Vercel deploy and `prisma migrate deploy` (the sandbox applied the SQL with psql); real fonts. Run the new migration on the real DB before testing /sell there.
+Wording on /sell is DRAFT: it only restates her title and numbers and makes no claims about fees, process, timelines or results. Marie Chris must approve or supply her own text.
+No email notification for new inquiries yet (inbox only).
+
+Next: Phase 12 (Contact page; header/footer contact details from `lib/broker.ts`, `/#contact` links retire). Then Phase 13 polish (sticky modal close button, real broker bio, Facebook URL, sitemap/robots, `approved` flags).
+
+## Phase 10 — Lead capture (DONE in sandbox, 2026-11-04; real deploy still unconfirmed)
+Status: code complete and now browser-tested. Verified 2026-11-04 against local Postgres 16 + real `next build` (fonts stubbed in a test copy only) + headless Chromium:
+- Backend: `tsc` clean; curl matrix (valid inquiry saved with listing snapshot, invalid email -> 400 message, honeypot -> `{ok:true}` but NOT saved, foreign Origin -> 403, admin list without login -> 401, admin list with login returns counts).
+- Public modal (desktop 1440): detail-page button shows "About: <listing>"; consent checkbox required; server error shown inline with typed values kept; fix + resend -> "Thank you"; reopening shows a fresh empty form; Escape closes; header button gives a general inquiry (no "About" line); honeypot is 1x1 px and invisible.
+- Mobile modal (390x844 and 320x640): no horizontal overflow, modal scrolls inside the viewport, Send button reachable. KNOWN MINOR: at 320x640 the "x" is absolutely positioned inside the scrolling modal, so it scrolls out of view once the form is scrolled down. Escape, backdrop tap (20 px margin) and scrolling up still close it; not changed (Phase 10 is additive). A sticky close button is a small Phase 13 polish item.
+- Admin inbox: logged out -> /admin/login; login -> dashboard shows the Inquiries card; inbox lists newest first; tab counts update after "Mark contacted"; per-listing filter works; delete confirm ("Keep it" keeps, "Delete" removes); dashboard count updates; mobile 390px has no horizontal overflow; no page errors.
+- Console errors seen were only blocked external images (Unsplash) in the sandbox plus the deliberate 400 from the bad-email test.
+NOT done / NOT verified: a real Render + Vercel deploy (Phases 1, 4, 5, 6 also still unconfirmed on a real deploy); real fonts; real Cloudinary photos; `prisma migrate dev` drift check (the sandbox applied the hand-written migration SQL directly with psql because Prisma's schema engine can't download); email notification (none exists).
+Sandbox note: `service postgresql start`, `PRISMA_SCHEMA_ENGINE_BINARY=/bin/true npx prisma generate`, `npm install --ignore-scripts`; background servers must be started with `setsid nohup ... < /dev/null &` or they die when the command ends.
+Awaiting confirmation: inquiry consent wording (`CONSENT_TEXT` in `frontend/lib/inquiry.ts` is DRAFT, not legal text) from Zee and the broker.
+
+Original Phase 10 notes:
+Backend (backend/):
+- `prisma/schema.prisma` — enums `InquiryType` (GENERAL/LISTING), `InquiryStatus` (NEW/CONTACTED/CLOSED); model `Inquiry` (name, phone, email, message, propertyId? SetNull, propertyTitle snapshot, consentAt); `Property.inquiries` back-relation.
+- `prisma/migrations/20261104000000_add_inquiry/migration.sql` — HAND-WRITTEN (applied cleanly to Postgres 16; first real `prisma migrate dev` should report no drift).
+- `src/inquiries.ts` (new) — public `POST /api/inquiries`: validation, honeypot `hp_extra`, Origin check, duplicate suppression (same email+message+listing within 10 min), in-memory throttle (5 per IP / 60 total per 15 min) counted only for inquiries that would be saved. Unknown/draft listing -> saved as GENERAL (never lose a lead). Returns only `{ok:true}`.
+- `src/admin.ts` — added `GET /api/admin/inquiries` (status, propertyId, limit, offset; returns counts), `PATCH /api/admin/inquiries/:id` {status}, `DELETE /api/admin/inquiries/:id`; `/summary` now also returns `inquiries`.
+- `src/index.ts` — mounts `/api/inquiries`.
+Frontend (frontend/):
+- `lib/inquiry.ts` (new) — `CONSENT_TEXT` (DRAFT wording, not legal text), `sendInquiry()` (60 s timeout for Render cold starts).
+- `components/InquiryModal.tsx` — real form: consent checkbox, honeypot, sending/error/sent states, `open()` and `openForListing()`; `InquireButton` takes optional `property`.
+- `components/PropertyDetail.tsx` — Inquire button passes the listing.
+- `lib/admin-api.ts` (types/labels appended), `components/admin/InquiryInbox.tsx` + `app/admin/inquiries/page.tsx` (new), `AdminShell.tsx` (Inquiries link), `AdminDashboard.tsx` (inquiries card).
+- `app/globals.css` — appended Phase 10 block.
+Decisions: bug found and fixed while testing (throttle originally counted invalid requests and would lock out a visitor fixing typos). Honeypot named `hp_extra` so autofill can't trip it. Inquiries are deletable (privacy requests/spam). Per-listing filter in the inbox uses the listings list from the admin API.
+Open items: consent wording must be confirmed by Zee and the broker. No email/notification on new inquiry yet (Marie Chris must check /admin/inquiries) — recommend deciding on an email provider. Phase 11 needs a SELL_APPRAISAL value added to `InquiryType`.
+Setup: `cd backend && npx prisma migrate deploy` (Render build already runs it).
+Sandbox tip: `PRISMA_SCHEMA_ENGINE_BINARY=/bin/true npx prisma generate` works offline.
+Next: Phase 11 (Sell & Appraisal pages; add SELL_APPRAISAL to `InquiryType` with a migration). Before that, Zee should run the Phase 10 migration on the real DB (`npx prisma migrate deploy`) and test one inquiry end to end on Render + Vercel.
+
+---
+
+## Phase 9 — Meet the Broker + About (written 2026-11-03)
+Files created (frontend/):
+- `lib/broker.ts` — the ONE `broker` constant: name lines, title, brand, phone (+tel href), email, location, Facebook (flagged placeholder), PRC/DHSUD numbers, taglines, trust line, photo, `bio` (null until the broker supplies it). Phase 12 must read this too; never copy these values.
+- `components/BrokerParts.tsx` — `BrokerPortrait`, `BrokerContactList`, `BrokerTagline`, `HouseDivider`, shared by the homepage section and /about.
+- `app/about/page.tsx` — /about: portrait, name (h1), About (marked placeholder until `broker.bio` is set), Credentials (PRC / DHSUD), Contact rows, tagline. Metadata built from the constant. Indexable.
+Files changed:
+- `components/Broker.tsx`, `components/Footer.tsx` — now read from `lib/broker.ts`; markup/classes identical to before (no visual change).
+- `components/Header.tsx` — About now links to `/about` (was `/#broker`) and highlights on that page.
+- `app/globals.css` — appended a Phase 9 block (nothing above edited).
+Decisions:
+- Bio is NOT invented. While `broker.bio` is null the page shows a dashed "Placeholder" note. To publish her text: set `bio: ["paragraph 1", "paragraph 2"]` in `lib/broker.ts`; the note disappears. Do this only with her written approval.
+- Homepage broker section gets no "Read more" link (design unchanged); the nav About link is the way in. Suggestion for later: a small link under the tagline.
+- Facebook link is still the generic facebook.com placeholder (Phase 12 needs the real URL).
+Verified: `next typegen` + `tsc` clean, eslint clean on touched files, real `next build` (fonts stubbed in the test copy only) passes with /about prerendered; headless Chromium at 1440 and 390px: one h1, About highlighted in nav, no horizontal overflow, no console errors, contact list text identical on home and /about, footer shows both credentials.
+NOT verified: real fonts (the test used fallbacks, so re-check spacing of the script name over "TAGSIP"), a real Vercel deploy, editing the constant and watching both pages change (both import the same object, so expected). The portrait top-alignment tweak was added after the screenshots and not re-rendered. Phases 1, 4, 5, 6 still unconfirmed on a real deploy.
+Next: Phase 10 (lead capture: Inquiry table, POST /api/inquiries, admin inbox, real modal form). Needs the privacy/consent wording confirmed with Zee and the broker.
+
+---
+
+## Phase 8 — Search & filters (finished 2026-11-03)
+Finishing pass (the last roadmap item, "Location options come from distinct locations in the data, not a hardcoded list"):
+- `backend/src/properties.ts` — new `GET /api/properties/locations` -> `{data: ["Cebu City", ...]}`: distinct non-empty cities of non-DRAFT listings, trimmed, case-insensitive duplicates merged, A-Z. Declared above `/:id`.
+- `frontend/lib/public-api.ts` — `getLocations()` (server, revalidate 60 s, never throws, `[]` on failure).
+- `frontend/components/HeroSection.tsx` (new) — server wrapper: fetches locations inside Suspense (fallback = the same hero with no cities, so no layout jump). `app/page.tsx` uses it instead of `Hero`.
+- `Hero.tsx` and `PropertyFilters.tsx` take a `locations` prop; `app/properties/page.tsx` fetches and passes it. `LOCATION_OPTIONS` removed from `lib/search.ts`.
+- Visible effect: until listings have a city, the Location dropdowns show only "Location"/"All locations". The 3 seeded placeholders have no city. Cities appear as soon as an admin enters one on a listing (within ~60 s). To restore the HTML's four fixed cities instead, re-add the constant and pass it as `locations`.
+- Checked: frontend `tsc` clean after `next typegen`, eslint clean on touched files (1 pre-existing warning in admin-api.ts). NOT checked: the backend change was not run or type-checked here (Prisma's engine download returns 403 in this sandbox), so run `cd backend && npm run typecheck`, then `curl localhost:4000/api/properties/locations` after adding a listing with a city.
+- Phase 8 roadmap items now all present: backend filters + sort, real hero search, DB-driven locations, URL-synced filters, empty state with clear.
+
+Original Phase 8 notes:
+Backend (`backend/src/properties.ts` only, no migration, no new dependency): `GET /api/properties` now also accepts `q` (each word must appear in title/city/address/description), `city` (exact city, or inside the address; case-insensitive), `propertyType`, `minPrice`/`maxPrice` (inclusive), `minBedrooms` (1-9), `sort=newest|price_asc|price_desc`. All validated (400 + message on bad input), combined with AND, DRAFT still hidden. `%` and `_` typed by a visitor are matched literally.
+Files created (frontend/):
+- `lib/search.ts` — option lists (locations, property types, hero price bands, sort), `parseSearch` (URL -> clean state, bad values dropped), `buildHref` (clean URLs), `toApiParams`, `heroHref`, peso label helpers
+- `components/PropertyFilters.tsx` — client: search box, type, location, bedrooms, min/max price, sort (sort applies immediately); writes everything to the URL; Filters toggle on <=650px
+Files changed:
+- `components/Hero.tsx` — search bar is real: submit goes to `/properties?...` (same markup/classes; selects got `name`/values)
+- `app/properties/page.tsx` — reads full URL state, filter bar, removable chips, "N properties match your search", empty state with Clear link, pagination keeps filters, `noindex, follow` when filtered
+- `lib/public-api.ts` — `getProperties(state)` takes the whole search state; `ListingFilter` now defined in `lib/search.ts` and re-exported
+- `app/globals.css` — appended Phase 8 block (nothing above edited)
+Decisions:
+- Choosing a hero Price Range also switches results to Buy (the bands are purchase prices; otherwise "Below ₱5M" would list every rental). Undo: in `heroHref` use `listing: "all"`.
+- Switching Buy/Rent tab keeps search words and filters but drops the price range (sale vs. monthly rent scales).
+- Price on /properties is free Min/Max (works for rent too); hero bands just fill it in. Band edges are inclusive (₱5M exactly appears in two bands).
+- Location and type lists are the HTML's dropdown options; broker still to confirm. Reversed min/max are swapped silently.
+- Added bedrooms filter and keyword search (not in the HTML hero); remove from `PropertyFilters` if unwanted.
+Verified (local Postgres 16 + real `next build` of a copy with Google Fonts removed + headless Chromium): backend curl matrix (every filter, sort, 400 cases, drafts hidden, wildcard escaping); `tsc` and eslint clean on touched files; hero -> /properties, keyword, chips, Back button, sort, reversed range, tab switch, pagination with filters, empty state, detail page, mobile filter panel, no horizontal overflow at 320-1440px.
+NOT verified: real fonts, real Render API / Cloudinary photos, touch devices, Lighthouse. Phases 1, 4, 5, 6 still unconfirmed on a real deploy.
+Heads-up: the 3 seeded placeholder listings have NO city, so the Location filter returns nothing for them until real listings with a city exist. Pre-existing lint error in `components/admin/PropertyList.tsx` untouched.
+Note: Next 16 keeps the previous route hidden in the DOM; tests must target visible elements.
+Next: Phase 9 (Meet the Broker + About).
+
+---
+
 ## Phase 7 — Properties grid + detail pages (written 2026-11-03)
 Backend: NO changes (Phase 3 list/detail endpoints already return everything needed, incl. `total`).
 Files created (frontend/):

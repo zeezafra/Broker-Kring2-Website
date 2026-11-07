@@ -9,7 +9,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   return (
     <InquiryProvider>
       <Header />
-      <main>{children}</main>
+      <main id="main">{children}</main>
       <Footer />
     </InquiryProvider>
   );

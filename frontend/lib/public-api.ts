@@ -1,4 +1,5 @@
 import type { AdminProperty, PropertyStatus } from "./admin-api";
+import { toApiParams, type ListingFilter, type SearchState } from "./search";
 
 // Server-side reads of the PUBLIC listings API (drafts are never returned by it).
 // API_URL is the Render URL on Vercel; the NEXT_PUBLIC fallback and localhost keep local dev working.
@@ -47,17 +48,16 @@ export function formatArea(n: number): string {
 // 3 columns x 3 rows on desktop.
 export const PAGE_SIZE = 9;
 
-// URL value used on /properties (?listing=buy|rent). Anything else means "all".
-export type ListingFilter = "all" | "buy" | "rent";
+// ?listing=buy|rent on /properties. Defined in lib/search.ts with the other Phase 8 URL helpers.
+export type { ListingFilter };
 
 export type ListResult =
   | { ok: true; data: ApiProperty[]; total: number; limit: number; offset: number }
   | { ok: false };
 
-export async function getProperties({ listing, page }: { listing: ListingFilter; page: number }): Promise<ListResult> {
-  const qs = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String((page - 1) * PAGE_SIZE) });
-  if (listing === "buy") qs.set("listingType", "SALE");
-  if (listing === "rent") qs.set("listingType", "RENT");
+// Phase 8: the page's parsed URL state (listing tab, search words, filters, sort, page) goes straight to the API.
+export async function getProperties(state: SearchState): Promise<ListResult> {
+  const qs = toApiParams(state, PAGE_SIZE);
   try {
     const res = await fetch(`${API_BASE}/api/properties?${qs}`, {
       next: { revalidate: 60 },
@@ -69,6 +69,22 @@ export async function getProperties({ listing, page }: { listing: ListingFilter;
     return { ok: true, data: body.data, total: body.total, limit: body.limit ?? PAGE_SIZE, offset: body.offset ?? 0 };
   } catch {
     return { ok: false };
+  }
+}
+
+// Phase 8: Location dropdown options come from the cities the listings really use. Never throws;
+// on any failure the dropdowns simply have no city options.
+export async function getLocations(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/properties/locations`, {
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data?: unknown };
+    return Array.isArray(body.data) ? body.data.filter((c): c is string => typeof c === "string") : [];
+  } catch {
+    return [];
   }
 }
 

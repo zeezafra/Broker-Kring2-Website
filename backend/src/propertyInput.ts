@@ -1,4 +1,4 @@
-import { ListingType, PropertyStatus, PropertyType } from "./generated/prisma/enums";
+import { CebuArea, ListingType, PropertyStatus, PropertyType } from "./generated/prisma/enums";
 
 // Hand-rolled validation for admin listing input (no extra dependency). Returns clean Prisma data
 // or a list of plain-English problems the admin form can show.
@@ -13,6 +13,7 @@ type Clean = {
   status?: PropertyStatus;
   price?: number;
   city?: string | null;
+  area?: CebuArea | null;
   address?: string | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
@@ -73,6 +74,14 @@ export function parsePropertyInput(body: unknown, partial: boolean): ParseResult
     const v = b[key];
     if (typeof v !== "string" || !allowed.includes(v as T)) errors.push(`${label} is not a valid choice`);
     else (data as Record<string, unknown>)[key] = v;
+  }
+
+  // area: NORTH, SOUTH, or empty/null to clear it
+  if (has(b, "area")) {
+    const v = b.area;
+    if (v === null || v === "") data.area = null;
+    else if (typeof v !== "string" || !Object.values(CebuArea).includes(v as CebuArea)) errors.push("Area must be North Cebu, South Cebu or empty");
+    else data.area = v as CebuArea;
   }
 
   // title

@@ -1,4 +1,4 @@
-// Phase 1: connection. Phase 3: Property. Phase 4: AdminUser. Phase 10 adds Inquiry.
+// Phase 1: connection. Phase 3: Property. Phase 4: AdminUser. Phase 10: Inquiry. Phase 11: sell/appraisal inquiries.
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -20,6 +20,15 @@ enum PropertyType {
   CONDOMINIUM
   TOWNHOUSE
   COMMERCIAL
+  LOT // added after Phase 13 at the broker's request
+}
+
+// Which half of Cebu a listing is in. The admin picks it per listing (nothing is guessed from the city name),
+// e.g. Carcar = SOUTH. Optional: Cebu City / Metro Cebu listings can leave it empty. Drives the
+// "North Cebu" / "South Cebu" options in the Location dropdowns.
+enum CebuArea {
+  NORTH
+  SOUTH
 }
 
 enum PropertyStatus {
@@ -42,6 +51,7 @@ model Property {
   price         Decimal        @db.Decimal(14, 2)
 
   city          String?
+  area          CebuArea?
   address       String?
   bedrooms      Int?
   bathrooms     Int?
@@ -58,6 +68,8 @@ model Property {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  inquiries     Inquiry[]
+
   @@index([status, listingType])
   @@index([featured])
 }
@@ -71,4 +83,58 @@ model AdminUser {
   passwordHash String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// Phase 10. GENERAL = sent from the header/home buttons; LISTING = sent from a listing page.
+// Phase 11: SELL_APPRAISAL = sent from the /sell page (an owner who wants to sell or get a property appraised).
+enum InquiryType {
+  GENERAL
+  LISTING
+  SELL_APPRAISAL
+}
+
+// Phase 11: what a /sell visitor asked for. Only set on SELL_APPRAISAL inquiries.
+enum InquiryService {
+  SELL
+  APPRAISAL
+}
+
+// The admin inbox workflow: NEW until someone reaches out, CONTACTED after that, CLOSED when done.
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+// A lead from the public "Inquire Now" form. Holds personal data of a visitor (name, phone, email),
+// so it is only ever returned by the admin API, never by a public endpoint.
+model Inquiry {
+  id            Int           @id @default(autoincrement())
+  type          InquiryType   @default(GENERAL)
+  status        InquiryStatus @default(NEW)
+
+  name          String
+  phone         String
+  email         String
+  message       String
+
+  // The listing the visitor was looking at. If the listing is deleted later the link is cleared
+  // (SetNull) but the title stays, so the inbox still shows what the inquiry was about.
+  propertyId    Int?
+  property      Property?     @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  propertyTitle String?
+
+  // Phase 11 (SELL_APPRAISAL only): what they want, and where their property is. Free text typed by the
+  // visitor, so it is shown as-is in the inbox and never trusted as a place name.
+  service          InquiryService?
+  propertyLocation String?
+
+  // When the visitor ticked the consent box. The form refuses to send without it.
+  consentAt     DateTime
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status, createdAt])
+  @@index([propertyId])
 }

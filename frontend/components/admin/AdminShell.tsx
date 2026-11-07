@@ -50,6 +50,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3 text-sm">
           <Link href="/admin" className="font-serif text-lg font-semibold">Admin</Link>
           <Link href="/admin/properties" className="font-semibold text-gold-dark hover:underline">Listings</Link>
+          <Link href="/admin/inquiries" className="font-semibold text-gold-dark hover:underline">Inquiries</Link>
           <Link href="/" className="text-muted hover:underline" target="_blank">View site</Link>
           <span className="ml-auto text-muted">{admin.name}</span>
           <button onClick={logout} className="rounded-full border border-gold px-4 py-1.5 font-semibold text-gold-dark hover:bg-cream">

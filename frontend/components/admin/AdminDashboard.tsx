@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Admin = { id: number; email: string; name: string };
-type Summary = { properties: { total: number; byStatus: Record<string, number>; placeholders: number } };
+type Summary = {
+  properties: { total: number; byStatus: Record<string, number>; placeholders: number };
+  inquiries: { total: number; byStatus: Record<string, number> };
+};
 type State =
   | { kind: "loading" }
   | { kind: "ready"; admin: Admin; summary: Summary | null }
@@ -109,6 +112,20 @@ export default function AdminDashboard() {
         )}
         <Link href="/admin/properties" className="gold-btn mt-6 inline-block">
           Manage listings
+        </Link>
+      </section>
+
+      <section className="mt-6 rounded-2xl bg-white p-7 shadow-card">
+        <h2 className="font-serif text-2xl font-semibold">Inquiries</h2>
+        {summary?.inquiries ? (
+          <p className="mt-2 text-muted">
+            {summary.inquiries.byStatus.NEW ?? 0} new, {summary.inquiries.total} in total.
+          </p>
+        ) : (
+          <p className="mt-2 text-muted">Inquiry counts are unavailable right now.</p>
+        )}
+        <Link href="/admin/inquiries" className="gold-btn mt-6 inline-block">
+          Open inbox
         </Link>
       </section>
     </main>

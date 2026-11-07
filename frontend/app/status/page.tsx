@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import ApiStatus from "@/components/ApiStatus";
+
+export const metadata: Metadata = { title: "Status | Cebu Properties by MCT", robots: { index: false, follow: false } };
 
 // Setup check kept at /status so the Render + Vercel wiring can still be verified. Not linked from the site.
 export default function StatusPage() {

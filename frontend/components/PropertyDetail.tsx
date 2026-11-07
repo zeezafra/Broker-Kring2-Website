@@ -72,7 +72,7 @@ export default function PropertyDetail({ p }: { p: ApiProperty }) {
               </div>
             )}
 
-            <InquireButton>Inquire Now &nbsp; →</InquireButton>
+            <InquireButton property={{ id: p.id, title: p.title }}>Inquire Now &nbsp; →</InquireButton>
             {p.isPlaceholder && <p className="detail-note">This is a sample listing used to preview the site. It is not a real property for sale.</p>}
           </div>
         </div>

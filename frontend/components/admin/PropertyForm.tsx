@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import {
   ApiError,
   adminFetch,
+  AREA_LABELS,
   type AdminProperty,
+  type CebuArea,
   type ListingType,
   LISTING_TYPE_LABELS,
   type PropertyStatus,
@@ -47,6 +49,7 @@ type FormState = {
   status: PropertyStatus;
   price: string;
   city: string;
+  area: CebuArea | "";
   address: string;
   bedrooms: string;
   bathrooms: string;
@@ -66,6 +69,7 @@ function toState(p?: AdminProperty): FormState {
     status: p?.status ?? "DRAFT",
     price: p ? String(p.price) : "",
     city: p?.city ?? "",
+    area: p?.area ?? "",
     address: p?.address ?? "",
     bedrooms: p?.bedrooms != null ? String(p.bedrooms) : "",
     bathrooms: p?.bathrooms != null ? String(p.bathrooms) : "",
@@ -143,6 +147,7 @@ export default function PropertyForm({ initial }: { initial?: AdminProperty }) {
       status: f.status,
       price: num(f.price),
       city: f.city,
+      area: f.area === "" ? null : f.area,
       address: f.address,
       bedrooms: num(f.bedrooms),
       bathrooms: num(f.bathrooms),
@@ -221,6 +226,14 @@ export default function PropertyForm({ initial }: { initial?: AdminProperty }) {
             <input id="city" value={f.city} onChange={(e) => set("city", e.target.value)} maxLength={120} />
           </div>
           <div className="form-field">
+            <label htmlFor="area">Area of Cebu</label>
+            <select id="area" className={selectClass} value={f.area} onChange={(e) => set("area", e.target.value as CebuArea | "")}>
+              <option value="">Not set (e.g. Cebu City)</option>
+              {Object.entries(AREA_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-muted">Pick the half of Cebu this property is in, e.g. Carcar is South Cebu. Visitors can then search by North or South.</p>
+          </div>
+          <div className="form-field sm:col-span-2">
             <label htmlFor="address">Address</label>
             <input id="address" value={f.address} onChange={(e) => set("address", e.target.value)} maxLength={200} />
           </div>

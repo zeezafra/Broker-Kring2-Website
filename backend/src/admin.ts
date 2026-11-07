@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-import { PropertyStatus } from "./generated/prisma/enums";
+import { InquiryStatus, InquiryType, PropertyStatus } from "./generated/prisma/enums";
 import { checkOrigin, requireAdmin } from "./auth";
 import { prisma } from "./db";
 import { parsePropertyInput } from "./propertyInput";
@@ -23,9 +23,10 @@ function parseId(value: unknown): number | null {
 
 // GET /api/admin/summary  ->  counts that include DRAFT listings (the public API hides those)
 adminRouter.get("/summary", async (_req, res) => {
-  const [grouped, placeholders] = await Promise.all([
+  const [grouped, placeholders, inquiryGroups] = await Promise.all([
     prisma.property.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.property.count({ where: { isPlaceholder: true } }),
+    prisma.inquiry.groupBy({ by: ["status"], _count: { _all: true } }),
   ]);
   const byStatus: Record<string, number> = {};
   let total = 0;
@@ -33,7 +34,16 @@ adminRouter.get("/summary", async (_req, res) => {
     byStatus[g.status] = g._count._all;
     total += g._count._all;
   }
-  res.json({ properties: { total, byStatus, placeholders } });
+  const inquiryByStatus: Record<string, number> = { NEW: 0, CONTACTED: 0, CLOSED: 0 };
+  let inquiryTotal = 0;
+  for (const g of inquiryGroups) {
+    inquiryByStatus[g.status] = g._count._all;
+    inquiryTotal += g._count._all;
+  }
+  res.json({
+    properties: { total, byStatus, placeholders },
+    inquiries: { total: inquiryTotal, byStatus: inquiryByStatus },
+  });
 });
 
 // GET /api/admin/properties?limit=50&offset=0  ->  every listing including DRAFT, newest first
@@ -118,4 +128,67 @@ adminRouter.post("/uploads/sign", (_req, res) => {
   const toSign = `allowed_formats=${ALLOWED_FORMATS}&folder=${folder}&timestamp=${timestamp}`;
   const signature = createHash("sha1").update(toSign + apiSecret).digest("hex");
   res.json({ cloudName, apiKey, timestamp, folder, allowedFormats: ALLOWED_FORMATS, signature });
+});
+
+// ---- Phase 10: inquiry inbox -----------------------------------------------------------------
+
+const INQUIRY_STATUSES = Object.values(InquiryStatus) as string[];
+const INQUIRY_TYPES = Object.values(InquiryType) as string[];
+
+// GET /api/admin/inquiries?status=NEW|CONTACTED|CLOSED&type=GENERAL|LISTING|SELL_APPRAISAL&propertyId=12&limit=50&offset=0
+//   -> { data, total, limit, offset, counts: { ALL, NEW, CONTACTED, CLOSED } }, newest first.
+// `counts` ignore the status filter (so the tabs can show every number) but respect propertyId and type.
+adminRouter.get("/inquiries", async (req, res) => {
+  const { status } = req.query;
+  if (status !== undefined && (typeof status !== "string" || !INQUIRY_STATUSES.includes(status))) {
+    return res.status(400).json({ error: "status must be NEW, CONTACTED or CLOSED" });
+  }
+  const { type } = req.query;
+  if (type !== undefined && (typeof type !== "string" || !INQUIRY_TYPES.includes(type))) {
+    return res.status(400).json({ error: "type must be GENERAL, LISTING or SELL_APPRAISAL" });
+  }
+  const propertyId = req.query.propertyId === undefined ? null : parseId(req.query.propertyId);
+  if (req.query.propertyId !== undefined && propertyId === null) {
+    return res.status(400).json({ error: "propertyId must be a listing number" });
+  }
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const base = { ...(propertyId ? { propertyId } : {}), ...(type ? { type: type as InquiryType } : {}) };
+  const where = status ? { ...base, status: status as InquiryStatus } : base;
+
+  const [rows, total, grouped] = await Promise.all([
+    prisma.inquiry.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit, skip: offset }),
+    prisma.inquiry.count({ where }),
+    prisma.inquiry.groupBy({ by: ["status"], where: base, _count: { _all: true } }),
+  ]);
+  const counts: Record<string, number> = { ALL: 0, NEW: 0, CONTACTED: 0, CLOSED: 0 };
+  for (const g of grouped) {
+    counts[g.status] = g._count._all;
+    counts.ALL += g._count._all;
+  }
+  res.json({ data: rows, total, limit, offset, counts });
+});
+
+// PATCH /api/admin/inquiries/:id  { status }  ->  move an inquiry through NEW -> CONTACTED -> CLOSED (any direction)
+adminRouter.patch("/inquiries/:id", async (req, res) => {
+  const id = parseId(req.params.id);
+  const status = req.body?.status;
+  if (typeof status !== "string" || !INQUIRY_STATUSES.includes(status)) {
+    return res.status(400).json({ error: "status must be NEW, CONTACTED or CLOSED" });
+  }
+  const existing = id ? await prisma.inquiry.findUnique({ where: { id }, select: { id: true } }) : null;
+  if (!id || !existing) return res.status(404).json({ error: "Inquiry not found" });
+
+  const updated = await prisma.inquiry.update({ where: { id }, data: { status: status as InquiryStatus } });
+  res.json({ data: updated });
+});
+
+// DELETE /api/admin/inquiries/:id  ->  permanent. Lets the broker erase a person's details when asked.
+adminRouter.delete("/inquiries/:id", async (req, res) => {
+  const id = parseId(req.params.id);
+  const existing = id ? await prisma.inquiry.findUnique({ where: { id }, select: { id: true } }) : null;
+  if (!id || !existing) return res.status(404).json({ error: "Inquiry not found" });
+  await prisma.inquiry.delete({ where: { id } });
+  res.json({ ok: true });
 });
