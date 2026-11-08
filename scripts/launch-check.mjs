@@ -20,7 +20,7 @@ const EXPECTED = {
   dhsudRegNo: "R7-B-06/26-8696",
   phoneDisplay: "+63 936 948 0702",
   phoneHref: "tel:+639369480702",
-  email: "mariechristagsip@gmail.com",
+  email: "cebupropertiesbymct@gmail.com",
 };
 
 const SKIP_DIRS = new Set(["node_modules", ".next", "dist", "build", ".git", ".vercel", "generated"]);
