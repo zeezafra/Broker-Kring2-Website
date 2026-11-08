@@ -52,10 +52,8 @@ export const broker: Broker = {
   trust: { lead: "Your Trusted Partner", small: "IN REAL ESTATE" },
   photo: { src: "/images/marie-chris-tagsip.jpg", alt: "Marie Chris L. Tagsip, REB, REA" },
   bio: [
-  "Welcome! I am Marie Chris L. Tagsip, a Licensed Real Estate Broker and Real Estate Appraiser based in Cebu City, Philippines.",
-  "With a passion for real estate and a commitment to serving people, I am dedicated to helping you find the right property, whether you are looking to buy your dream home, explore rental opportunities, or sell your property.",
-  "I believe that real estate is more than just a transaction. It is about building relationships, discovering opportunities, and making informed decisions that shape your future.",
-  "Guided by my faith and trust in God's plan, I approach every opportunity with integrity, dedication, and genuine care for the people I serve.",
-  "Your next chapter begins with the right property. I look forward to helping you make it happen."
+    "Welcome. I am Marie Chris L. Tagsip, a licensed real estate broker and appraiser in Cebu City.",
+    "I am here to guide you in turning your real estate goals into reality, whether you are buying, renting or selling.",
+    "Guided by my faith and my belief in God\u2019s plan, I look forward to helping you find the right property.",
   ],
 };
