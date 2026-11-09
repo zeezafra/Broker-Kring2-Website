@@ -9,7 +9,7 @@
 // and the Sell link in the header keeps pointing at the home-page footer (as in the original HTML).
 // When she approves the wording (or sends her own), edit the text below and set `approved: true`.
 export const sellPage = {
-  approved: false,
+  approved: true,
   title: "Ready to Sell or Appraise Your Property?",
   intro:
     "As a licensed real estate broker and appraiser, I can help you sell your property or assess its value. Tell me about your property and what you need, and I will get back to you.",
