@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { AREA_OPTIONS, heroHref, PRICE_BANDS, TYPE_OPTIONS, type AreaSlug } from "@/lib/search";
 import LocationPicker from "./LocationPicker";
 
@@ -13,25 +14,67 @@ export default function Hero() {
   const [area, setArea] = useState<AreaSlug | "">("");
   const [city, setCity] = useState("");
   const [open, setOpen] = useState(false);
+  // On phones the panel is a bottom sheet (always inside the screen, above the header and the cards); on larger
+  // screens it is a popover under the Location field, or above it when there is no room below.
+  const [sheet, setSheet] = useState(false);
+  const [up, setUp] = useState(false);
   const locRef = useRef<HTMLDivElement>(null);
 
-  // Close the panel on a click outside it or Escape.
+  function toggleLocation() {
+    if (open) return setOpen(false);
+    const rect = locRef.current?.getBoundingClientRect();
+    setSheet(window.matchMedia("(max-width: 650px)").matches);
+    setUp(rect ? window.innerHeight - rect.bottom < 330 : false);
+    setOpen(true);
+  }
+
+  // Esc closes the panel; a click outside closes the popover (the sheet has its own backdrop); the page behind
+  // the sheet does not scroll.
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (locRef.current && !locRef.current.contains(e.target as Node)) setOpen(false);
+      if (!sheet && locRef.current && !locRef.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    if (sheet) document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
     };
-  }, [open]);
+  }, [open, sheet]);
 
   const regionLabel = AREA_OPTIONS.find((a) => a.slug === area)?.label ?? "";
-  const locationLabel = [regionLabel, city].filter(Boolean).join(" · ") || "Location";
+  // Just the city once one is chosen (its region is implied), so the label fits the half-width field on phones.
+  const locationLabel = city || regionLabel || "Location";
+
+  const panel = (
+    <>
+      <div className="loc-head">
+        <h3>Find your next property</h3>
+        {sheet && (
+          <button type="button" className="loc-close" aria-label="Close" onClick={() => setOpen(false)}>
+            ×
+          </button>
+        )}
+      </div>
+      <LocationPicker
+        idPrefix="hero"
+        area={area}
+        city={city}
+        onChange={(next) => {
+          setArea(next.area);
+          setCity(next.city);
+        }}
+      />
+      <button type="button" className="gold-btn loc-done" onClick={() => setOpen(false)}>
+        Done
+      </button>
+    </>
+  );
 
   function onSearch(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -57,29 +100,28 @@ export default function Hero() {
             <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
             <circle cx="12" cy="10" r="2.5" />
           </svg>
-          <button type="button" className="loc-trigger" aria-haspopup="dialog" aria-expanded={open} aria-label="Location" onClick={() => setOpen((o) => !o)}>
+          <button type="button" className="loc-trigger" aria-haspopup="dialog" aria-expanded={open} aria-label="Location" onClick={toggleLocation}>
             <span>{locationLabel}</span>
             <svg className="loc-chevron" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
-          {open && (
-            <div className="loc-panel" role="dialog" aria-label="Choose a location">
-              <h3>Find your next property</h3>
-              <LocationPicker
-                idPrefix="hero"
-                area={area}
-                city={city}
-                onChange={(next) => {
-                  setArea(next.area);
-                  setCity(next.city);
-                }}
-              />
-              <button type="button" className="gold-btn loc-done" onClick={() => setOpen(false)}>
-                Done
-              </button>
+          {open && !sheet && (
+            <div className={`loc-panel${up ? " up" : ""}`} role="dialog" aria-label="Choose a location">
+              {panel}
             </div>
           )}
+          {open &&
+            sheet &&
+            createPortal(
+              <>
+                <div className="loc-backdrop" onClick={() => setOpen(false)} />
+                <div className="loc-sheet" role="dialog" aria-modal="true" aria-label="Choose a location">
+                  {panel}
+                </div>
+              </>,
+              document.body,
+            )}
         </div>
         <label className="search-field">
           <svg viewBox="0 0 24 24">

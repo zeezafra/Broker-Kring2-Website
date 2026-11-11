@@ -1,5 +1,25 @@
 # HANDOFF — Cebu Properties by MCT (Marie Chris L. Tagsip, REB, REA)
 
+## CHANGE-03 — Dual-thumb price range slider on /properties (2026-11-11; NOT yet built with `next build` or deployed)
+Scope: the "Price range" filter on /properties only. Backend, the hero search bar, `page.tsx`, `lib/search.ts`, cards, detail pages and every other filter are untouched (the other filters keep their code; Beds + Sort moved into a small wrapper div to make room, see below).
+Files (all in `frontend/`)
+- `components/PriceRangeSlider.tsx` (NEW): one track, two draggable thumbs (ARIA `role="slider"`, no new dependency), gold fill between them, live Minimum / Maximum readout in serif above, reference labels under the track, "Reset range" link.
+- `lib/priceRange.ts` (NEW): the CONFIG (`SALE_PRICE_SCALE` ₱0-₱20M+, step ₱500K; `RENT_PRICE_SCALE` ₱0-₱100K+, step ₱5K, caption "per month") plus pure range math and ₱ formatting. Edit min / max / step / tick labels there.
+- `components/PropertyFilters.tsx`: price `<select>` and its band state removed; slider state `range` added; `apply()` takes `{ sort?, range? }`; Beds + Sort sit in a `.filter-stack` wrapper next to the slider. Unused band imports removed (the helpers stay exported in `lib/search.ts`: the hero and `page.tsx` still use `PRICE_BANDS` / `priceLabel`).
+- `app/globals.css`: ONE block appended at the end ("Premium dual-thumb price range slider"), scoped to `.prs`, `.filter-price`, `.filter-stack`. Nothing above it was edited.
+Behaviour / decisions
+- Max thumb at the right end means NO maximum (no `maxPrice` in the URL), so "₱20M+" includes a ₱35M listing; min thumb at ₱0 sends no `minPrice`. URL params are unchanged (`minPrice` / `maxPrice`), so old links, the hero bands and the removable price chip all keep working. Values from an old/hand-edited URL (e.g. ₱4.2M, ₱35M) are shown as they are and only change if a thumb is moved.
+- Min can never pass max and max can never fall below min (equal is allowed; if both thumbs sit together, the first drag direction decides which one moves).
+- Results apply when the visitor RELEASES a thumb (mouse/touch) or taps the track, on Reset, or on Enter (keyboard). Keyboard arrows only change the readout until Enter or Search, because the form remounts when the URL changes and applying on every key press would drop focus. Slider commits use `router.push(..., { scroll: false })` so the page does not jump.
+- Mobile: `panelWasOpen` (module variable in `PropertyFilters.tsx`) keeps the Filters panel open across the remount; before, it closed after every change. This also applies to Sort. On touch a tap on the EMPTY track is applied on release, so a vertical swipe that starts on the slider just scrolls the page.
+- Rent tab uses the rent scale (sale prices and monthly rent differ ~100x). THE RENT NUMBERS ARE MY PROPOSAL (they line up with the existing rent bands); confirm with the broker. "All" uses the sale scale, so any minimum above ₱0 hides rentals (same as the old bands did).
+- Hero Price Range dropdown NOT changed (a slider does not fit the 64px pill). Its band is read by the slider after the redirect (e.g. "Above ₱20M" shows ₱20M - ₱20M+).
+- Known, left alone: the "Filters" badge counts min and max separately (a two-sided range shows 2).
+Verified (2026-11-11, sandbox): the REAL `PropertyFilters` + `PriceRangeSlider` + real `globals.css` bundled with esbuild and driven in headless Chromium (only `next/link` / `next/navigation` stubbed): 37 desktop checks (live readout while dragging, commit on release, never-cross at both ends, coincident thumbs, open max, track click, all keys, Reset keeps other filters, Sort and Search keep the range, off-grid / out-of-scale URL values, rent scale) and the mobile checks (real touch drag via CDP, tap, vertical-swipe-scrolls, panel stays open, no horizontal overflow at 320/360/375/390/768/1024/1440). `lib/priceRange.ts` unit-tested (13 groups incl. a 40k-move fuzz) and strict-`tsc` clean. Backend filter confirmed inclusive (`gte` / `lte`).
+NOT verified: `next build`, `next lint` and project-wide `tsc` (no node_modules in the sandbox, so `PriceRangeSlider.tsx` / `PropertyFilters.tsx` were not type-checked against @types/react); real fonts (test used Georgia/Arial stand-ins for Playfair/DM Sans); a real phone; screen readers (ARIA slider pattern implemented, not tested with NVDA / VoiceOver); Safari/Firefox (only Chromium run).
+
+---
+
 ## CHANGE-02 — Cascading Cebu location selector in Admin Add/Edit Property (2026-11-11; real deploy NOT done; barangay data NOT yet verified against the official PSA file)
 Scope: the location fields of the admin Add/Edit Property form and the backend/database support they need. Public site, search, filters, cards, detail pages, auth, image upload and every non-location field are untouched. No git repo existed in the upload, so no commit was made.
 

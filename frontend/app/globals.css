@@ -493,3 +493,82 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in srgb,curre
 .loc-panel{position:absolute;top:calc(100% + 14px);left:-8px;z-index:5;width:min(360px,calc(100vw - 40px));display:grid;gap:14px;padding:18px;background:#fff;color:var(--color-ink);border-radius:20px;box-shadow:0 18px 40px rgba(30,24,16,.2);white-space:normal}
 .loc-panel h3{margin:0;font:600 20px var(--font-serif)}
 .searchbar .loc-done{min-width:0;width:100%;height:44px;margin-top:0;padding:0 20px}
+
+/* Location panel, mobile + short screens (CHANGE-02d). The panel is always one column; on phones it is a bottom sheet. */
+.loc-panel{grid-template-columns:minmax(0,1fr)}
+.loc-panel.up{top:auto;bottom:calc(100% + 14px)}
+.searchbar .loc-done{grid-column:auto}
+.loc-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.loc-close{width:40px;height:40px;margin:-8px -8px -8px 0;border:0;border-radius:50%;background:var(--color-cream);color:#555;font-size:26px;line-height:1;display:grid;place-items:center;flex:none}
+.loc-backdrop{position:fixed;inset:0;z-index:60;background:rgba(18,17,17,.5)}
+.loc-sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;max-height:calc(100dvh - 24px);overflow-y:auto;display:grid;grid-template-columns:minmax(0,1fr);gap:16px;padding:20px 18px calc(20px + env(safe-area-inset-bottom));background:#fff;color:var(--color-ink);border-radius:22px 22px 0 0;box-shadow:0 -12px 40px rgba(30,24,16,.22)}
+.loc-sheet h3{margin:0;font:600 22px var(--font-serif)}
+.loc-sheet .filter-field{font-size:14px}
+.loc-sheet .filter-field select{height:50px;font-size:16px}
+.loc-sheet .loc-done{width:100%;height:50px;margin:0;padding:0 20px;font-size:16px}
+@media(max-width:340px){.loc-sheet{padding:18px 14px calc(18px + env(safe-area-inset-bottom))}}
+
+/* ==========================================================================
+   Premium dual-thumb price range slider (/properties filters).
+   Everything is scoped under .prs / .filter-price / .filter-stack; nothing above this block was edited.
+   Colours are the existing tokens: gold #B98A4A, gold-dark #9b7138, cream, ink, muted.
+   ========================================================================== */
+.filter-price{grid-column:span 2;min-width:0;padding:16px 20px 12px;background:var(--color-cream);border:1px solid #eee5da;border-radius:16px}
+.filter-stack{display:grid;align-content:start;gap:14px;min-width:0}
+
+.prs{--prs-thumb:28px;--prs-pad:16px;user-select:none;-webkit-user-select:none}
+.prs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:28px}
+.prs-label{font-size:13px;font-weight:600;color:var(--color-muted)}
+.prs-caption{font-weight:400}
+.prs-reset{border:0;background:none;padding:4px 2px;min-height:32px;font:inherit;font-size:14px;font-weight:600;color:var(--color-gold-dark);text-decoration:underline;text-underline-offset:3px;transition:color .2s}
+.prs-reset:hover:not(:disabled){color:var(--color-ink)}
+.prs-reset:disabled{color:#b3aca1;text-decoration:none;cursor:default}
+.prs-reset:focus-visible{outline:2px solid var(--color-gold);outline-offset:3px;border-radius:6px}
+
+/* Live minimum / maximum readout, above the track */
+.prs-values{display:flex;align-items:flex-end;gap:14px;margin:2px 0 6px}
+.prs-value{display:grid;gap:2px;min-width:0}
+.prs-value-end{text-align:right}
+.prs-cap{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6b6a64}
+.prs-value strong{font:600 26px/1.1 var(--font-serif);color:var(--color-ink);font-variant-numeric:lining-nums tabular-nums;white-space:nowrap}
+.prs-link{flex:1;min-width:16px;height:1px;margin-bottom:9px;background:linear-gradient(90deg,transparent,#d6c6ae 20%,#d6c6ae 80%,transparent)}
+
+/* Track area: tall enough for a finger; vertical scrolling still works, horizontal drags move the thumbs */
+.prs-area{position:relative;padding:11px var(--prs-pad);touch-action:pan-y;cursor:pointer}
+.prs-track{position:relative;height:6px;border-radius:999px;background:#e9e1d4;box-shadow:inset 0 1px 2px rgba(36,28,18,.14)}
+.prs-fill{position:absolute;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,#cfa468,var(--color-gold))}
+.prs-thumb{position:absolute;top:50%;width:var(--prs-thumb);height:var(--prs-thumb);margin:0;border-radius:50%;background:#fff;border:2px solid var(--color-gold);box-shadow:0 4px 12px rgba(36,28,18,.22),0 1px 2px rgba(36,28,18,.16);transform:translate(-50%,-50%) scale(var(--s,1));display:grid;place-items:center;cursor:grab;outline:0;touch-action:pan-y}
+.prs-thumb:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--color-gold)}
+.prs-thumb:after{content:"";position:absolute;inset:-9px;border-radius:50%} /* bigger invisible touch target */
+.prs-thumb:hover{--s:1.08}
+.prs-thumb.is-active{--s:1.14;cursor:grabbing;box-shadow:0 0 0 7px rgba(185,138,74,.18),0 6px 16px rgba(36,28,18,.26)}
+.prs-thumb:focus-visible{box-shadow:0 0 0 4px rgba(185,138,74,.38),0 4px 12px rgba(36,28,18,.22)}
+.prs.is-dragging,.prs.is-dragging .prs-area{cursor:grabbing}
+
+/* Smooth movement for keyboard, Reset and taps; no lag while dragging */
+.prs-thumb{transition:transform .18s ease,box-shadow .18s ease}
+.prs:not(.is-dragging) .prs-thumb{transition:transform .18s ease,box-shadow .18s ease,left .22s cubic-bezier(.2,.7,.2,1)}
+.prs:not(.is-dragging) .prs-fill{transition:left .22s cubic-bezier(.2,.7,.2,1),width .22s cubic-bezier(.2,.7,.2,1)}
+
+/* Reference labels under the track */
+.prs-scale{padding:0 var(--prs-pad)}
+.prs-ticks{position:relative;height:30px}
+.prs-tick{position:absolute;top:0;transform:translateX(-50%);padding-top:10px;font-size:12px;font-weight:600;color:#6b6a64;white-space:nowrap;font-variant-numeric:tabular-nums}
+.prs-tick:before{content:"";position:absolute;top:0;left:50%;width:1px;height:6px;background:#cfc5b6}
+
+@media(max-width:650px){
+/* Two-column filter panel: Type | Region, City | Bedrooms, then the slider and Sort at full width */
+.filter-stack{display:contents}
+.filter-price{grid-column:1/-1;order:1;padding:14px 16px 10px}
+.filter-stack .filter-field:last-child{grid-column:1/-1;order:2}
+.filters-actions{order:3}
+.prs-value strong{font-size:23px}
+}
+@media(max-width:360px){
+.prs{--prs-pad:14px}
+.prs-value strong{font-size:21px}
+.prs-tick{font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){
+.prs-thumb,.prs:not(.is-dragging) .prs-thumb,.prs:not(.is-dragging) .prs-fill{transition:none}
+}

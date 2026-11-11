@@ -5,20 +5,25 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import {
   BEDROOM_OPTIONS,
-  bandsFor,
   buildHref,
   filterCount,
   hasActiveFilters,
-  matchBand,
   parseSearch,
-  priceLabel,
   SORT_OPTIONS,
   TYPE_OPTIONS,
   type AreaSlug,
   type SearchState,
   type SortKey,
 } from "@/lib/search";
+import { priceScaleFor, pricesFromRange, rangeFromPrices, type PriceRange } from "@/lib/priceRange";
 import LocationPicker from "./LocationPicker";
+import PriceRangeSlider from "./PriceRangeSlider";
+
+// Whether the mobile "Filters" panel is open. PropertyFilters is remounted (key = URL, see app/properties/page.tsx)
+// every time results change, which would otherwise close the panel under the visitor's finger after each slider
+// release. A module variable survives the remount; it is only ever set from a click, never on the server, so the
+// first (server) render and hydration always start closed.
+let panelWasOpen = false;
 
 // Search box + filters + sort for /properties. Every change goes into the URL (see lib/search.ts), so a
 // filtered view can be shared, bookmarked and reached with the Back button. The page re-fetches on navigation.
@@ -26,7 +31,7 @@ import LocationPicker from "./LocationPicker";
 export default function PropertyFilters({ state }: { state: SearchState }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [open, setOpen] = useState(false); // filter panel, small screens only
+  const [open, setOpen] = useState(() => panelWasOpen); // filter panel, small screens only
 
   const [q, setQ] = useState(state.q);
   // Region and city are two linked dropdowns (LocationPicker).
@@ -34,27 +39,28 @@ export default function PropertyFilters({ state }: { state: SearchState }) {
   const [city, setCity] = useState(state.city);
   const [type, setType] = useState<string>(state.type);
   const [beds, setBeds] = useState(state.beds === null ? "" : String(state.beds));
-  // One "Price range" dropdown. Value is a band key, "" for any price, or "custom" when the URL carries a
-  // min/max that matches no band (an old shared link): it stays selected and is kept until the visitor picks another.
-  const bands = bandsFor(state.listing);
-  const hasPrice = state.minPrice !== null || state.maxPrice !== null;
-  const matched = matchBand(state.listing, state.minPrice, state.maxPrice);
-  const [price, setPrice] = useState(!hasPrice ? "" : matched ? matched.key : "custom");
+  // Price range: a dual-thumb slider (PriceRangeSlider). The scale depends on the Buy/Rent tab (sale prices vs.
+  // monthly rent). The range is held here as slider values; apply() turns it into minPrice / maxPrice for the URL.
+  // A price that came from an old link or the hero's band dropdown is shown as it is and only changes if the
+  // visitor moves a thumb.
+  const priceScale = priceScaleFor(state.listing);
+  const [range, setRange] = useState<PriceRange>(() => rangeFromPrices(priceScale, state.minPrice, state.maxPrice));
   const [sort, setSort] = useState<SortKey>(state.sort);
 
-  function apply(sortOverride?: SortKey) {
-    // parseSearch cleans the typed values the same way the page will (digits only, min/max swapped if reversed).
-    const band = bands.find((b) => b.key === price);
-    const keepCustom = price === "custom";
+  // `override` lets a control apply its own new value at once (Sort, and the price slider on release / Reset),
+  // because setState has not updated yet when the handler runs.
+  function apply(override: { sort?: SortKey; range?: PriceRange } = {}) {
+    // parseSearch cleans the values the same way the page will (digits only, min/max swapped if reversed).
+    const prices = pricesFromRange(priceScale, override.range ?? range);
     const clean = parseSearch({
       q,
       city,
       area,
       type,
       beds,
-      minPrice: String(band?.min ?? (keepCustom ? state.minPrice : null) ?? ""),
-      maxPrice: String(band?.max ?? (keepCustom ? state.maxPrice : null) ?? ""),
-      sort: sortOverride ?? sort,
+      minPrice: String(prices.minPrice ?? ""),
+      maxPrice: String(prices.maxPrice ?? ""),
+      sort: override.sort ?? sort,
     });
     startTransition(() => {
       router.push(
@@ -69,6 +75,8 @@ export default function PropertyFilters({ state }: { state: SearchState }) {
           maxPrice: clean.maxPrice,
           sort: clean.sort,
         }),
+        // Releasing the slider must not jump the page to the top (the visitor may be mid-adjustment on a phone).
+        override.range ? { scroll: false } : undefined,
       );
     });
   }
@@ -103,7 +111,10 @@ export default function PropertyFilters({ state }: { state: SearchState }) {
           className="filters-toggle"
           aria-expanded={open}
           aria-controls="filterPanel"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            panelWasOpen = !open;
+            setOpen(!open);
+          }}
         >
           Filters
           {active > 0 && <span className="filters-count">{active}</span>}
@@ -134,47 +145,48 @@ export default function PropertyFilters({ state }: { state: SearchState }) {
             setCity(next.city);
           }}
         />
-        <label className="filter-field">
-          Bedrooms
-          <select name="beds" value={beds} onChange={(e) => setBeds(e.target.value)}>
-            <option value="">Any</option>
-            {BEDROOM_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n}+
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="filter-field">
-          Price range
-          <select name="price" value={price} onChange={(e) => setPrice(e.target.value)}>
-            <option value="">Any price</option>
-            {price === "custom" && <option value="custom">Custom: {priceLabel(state.minPrice, state.maxPrice)}</option>}
-            {bands.map((b) => (
-              <option key={b.key} value={b.key}>
-                {b.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="filter-field">
-          Sort by
-          <select
-            name="sort"
-            value={sort}
-            onChange={(e) => {
-              const next = e.target.value as SortKey;
-              setSort(next);
-              apply(next);
+        <div className="filter-price">
+          <PriceRangeSlider
+            scale={priceScale}
+            value={range}
+            onChange={setRange}
+            onCommit={(next) => {
+              setRange(next);
+              apply({ range: next });
             }}
-          >
-            {SORT_OPTIONS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
+        <div className="filter-stack">
+          <label className="filter-field">
+            Bedrooms
+            <select name="beds" value={beds} onChange={(e) => setBeds(e.target.value)}>
+              <option value="">Any</option>
+              {BEDROOM_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}+
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            Sort by
+            <select
+              name="sort"
+              value={sort}
+              onChange={(e) => {
+                const next = e.target.value as SortKey;
+                setSort(next);
+                apply({ sort: next });
+              }}
+            >
+              {SORT_OPTIONS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         {hasActiveFilters(state) && (
           <div className="filters-actions">
             <Link href={buildHref({ listing: state.listing })}>Clear all filters</Link>
