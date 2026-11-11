@@ -572,3 +572,17 @@ input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in srgb,curre
 @media(prefers-reduced-motion:reduce){
 .prs-thumb,.prs:not(.is-dragging) .prs-thumb,.prs:not(.is-dragging) .prs-fill{transition:none}
 }
+
+/* ==========================================================================
+   Hero Price Range slider (CHANGE-04). The hero's Price Range field now opens the same kind of panel as Location
+   (a popover; a bottom sheet on phones) holding the dual-thumb slider from /properties. It reuses .loc-field,
+   .loc-trigger, .loc-panel, .loc-sheet and the .prs slider styles above. Nothing above this block was edited.
+   ========================================================================== */
+/* The Price Range field is the third one, so its popover hangs from the field's right edge: it never runs past the
+   right side of the screen on tablets. */
+.loc-panel.price-panel{left:auto;right:-8px}
+/* The slider sits in the same cream box it has on /properties (.filter-price is a grid item there, so it is not reused). */
+.hero-price{min-width:0;padding:14px 18px 10px;background:var(--color-cream);border:1px solid #eee5da;border-radius:16px}
+@media(max-width:650px){
+.loc-sheet .hero-price{padding:14px 16px 10px}
+}

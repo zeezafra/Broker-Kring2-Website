@@ -124,3 +124,14 @@ export function spokenPeso(n: number): string {
 export function formatMax(scale: PriceScale, hi: number | null): string {
   return hi === null ? `${formatPeso(scale.max)}+` : formatPeso(hi);
 }
+
+/**
+ * Short summary of a range for a closed field (the hero's Price Range button): "₱5M – ₱10M", "Up to ₱5M",
+ * "₱10M and up". Empty string for the full range (nothing chosen), so the caller can show its placeholder.
+ */
+export function rangeLabel(scale: PriceScale, r: PriceRange): string {
+  const hi = r.hi;
+  if (r.lo <= scale.min) return hi === null ? "" : `Up to ${formatPeso(hi)}`;
+  if (hi === null) return `${formatPeso(r.lo)} and up`;
+  return `${formatPeso(r.lo)} – ${formatPeso(hi)}`;
+}

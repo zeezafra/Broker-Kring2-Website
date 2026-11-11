@@ -27,8 +27,8 @@ export const AREA_OPTIONS: { slug: AreaSlug; value: string; label: string }[] = 
   { slug: "metro", value: "METRO_CEBU_MACTAN", label: "Metro Cebu & Mactan" },
 ];
 
-// The hero's "Price Range" bands. They are purchase-price bands, so choosing one from the hero also
-// switches the results to Buy (see heroHref); otherwise "Below ₱5M" would list every rental.
+// Purchase-price bands. No screen renders them any more (/properties has the price slider since CHANGE-03 and the
+// hero since CHANGE-04); they are left here, with bandsFor / matchBand, so nothing else has to be edited.
 export const PRICE_BANDS: { key: string; label: string; min?: number; max?: number }[] = [
   { key: "below-5m", label: "Below ₱5M", max: 5_000_000 },
   { key: "5m-10m", label: "₱5M – ₱10M", min: 5_000_000, max: 10_000_000 },
@@ -179,16 +179,18 @@ export function toApiParams(s: SearchState, pageSize: number): URLSearchParams {
 }
 
 // Where the hero search bar sends the visitor. `area` is a region slug and `city` a city or municipality name
-// (both from the Location panel).
-export function heroHref(v: { area: AreaSlug | ""; city: string; type: string; band: string }): string {
-  const band = PRICE_BANDS.find((b) => b.key === v.band);
+// (both from the Location panel). `minPrice` / `maxPrice` come from the hero's price slider (purchase scale; null =
+// not set, see pricesFromRange in lib/priceRange.ts). Any price at all also switches the results to Buy, because the
+// slider is a purchase-price range; otherwise "Up to ₱5M" would list every rental.
+export function heroHref(v: { area: AreaSlug | ""; city: string; type: string; minPrice: number | null; maxPrice: number | null }): string {
+  const hasPrice = v.minPrice !== null || v.maxPrice !== null;
   return buildHref({
-    listing: band ? "buy" : "all",
+    listing: hasPrice ? "buy" : "all",
     area: v.area,
     city: v.city,
     type: TYPE_OPTIONS.some((t) => t.slug === v.type) ? (v.type as TypeSlug) : "",
-    minPrice: band?.min ?? null,
-    maxPrice: band?.max ?? null,
+    minPrice: v.minPrice,
+    maxPrice: v.maxPrice,
   });
 }
 
