@@ -1,4 +1,5 @@
 import { CebuArea, ListingType, PropertyStatus, PropertyType } from "./generated/prisma/enums";
+import { resolveLocation } from "./locations";
 
 // Hand-rolled validation for admin listing input (no extra dependency). Returns clean Prisma data
 // or a list of plain-English problems the admin form can show.
@@ -15,6 +16,11 @@ type Clean = {
   city?: string | null;
   area?: CebuArea | null;
   address?: string | null;
+  region?: string | null;
+  cityCode?: string | null;
+  barangay?: string | null;
+  barangayCode?: string | null;
+  subdivision?: string | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   floorAreaSqm?: number | null;
@@ -38,7 +44,7 @@ export function parsePropertyInput(body: unknown, partial: boolean): ParseResult
   const b = body as Record<string, unknown>;
   const data: Clean = {};
 
-  function text(key: "description" | "city" | "address", label: string, max: number) {
+  function text(key: "description" | "city" | "address" | "subdivision", label: string, max: number) {
     if (!has(b, key)) return;
     const v = b[key];
     if (v === null || v === "") {
@@ -76,14 +82,6 @@ export function parsePropertyInput(body: unknown, partial: boolean): ParseResult
     else (data as Record<string, unknown>)[key] = v;
   }
 
-  // area: NORTH, SOUTH, or empty/null to clear it
-  if (has(b, "area")) {
-    const v = b.area;
-    if (v === null || v === "") data.area = null;
-    else if (typeof v !== "string" || !Object.values(CebuArea).includes(v as CebuArea)) errors.push("Area must be North Cebu, South Cebu or empty");
-    else data.area = v as CebuArea;
-  }
-
   // title
   if (has(b, "title")) {
     const v = b.title;
@@ -92,8 +90,44 @@ export function parsePropertyInput(body: unknown, partial: boolean): ParseResult
   } else if (!partial) errors.push("Title is required");
 
   text("description", "Description", 5000);
-  text("city", "City", 120);
-  text("address", "Address", 200);
+  text("address", "Street address", 200);
+  text("subdivision", "Subdivision / project name", 150);
+
+  // Location. Two ways in:
+  //  1. The location selector sends region + cityCode + barangayCode together. They are checked against the
+  //     directory (each must exist and belong to the one above it) and `city` / `area` are then filled in from
+  //     the directory, so whatever the browser sends for those two is ignored.
+  //  2. Older callers may still send plain `city` / `area`; that keeps working for listings that have no
+  //     structured location yet (admin.ts refuses it for listings that do).
+  const structuredKeys = ["region", "cityCode", "barangayCode"] as const;
+  const sentStructured = structuredKeys.filter((k) => has(b, k));
+  if (sentStructured.length > 0) {
+    const empty = (v: unknown) => v === null || v === "";
+    if (sentStructured.length < structuredKeys.length) {
+      errors.push("Send region, cityCode and barangayCode together (use null to clear them)");
+    } else if (structuredKeys.every((k) => empty(b[k]))) {
+      // Clearing the whole location.
+      Object.assign(data, { region: null, cityCode: null, barangay: null, barangayCode: null, city: null, area: null });
+    } else if (empty(b.region) || empty(b.cityCode)) {
+      errors.push("Choose a region and a city or municipality before a barangay");
+    } else {
+      const r = resolveLocation({ region: b.region, cityCode: b.cityCode, barangayCode: empty(b.barangayCode) ? null : b.barangayCode });
+      if (!r.ok) errors.push(r.error);
+      else {
+        const v = r.value;
+        Object.assign(data, { region: v.region, cityCode: v.cityCode, barangay: v.barangay, barangayCode: v.barangayCode, city: v.city, area: v.area });
+      }
+    }
+  } else {
+    text("city", "City", 120);
+    // area: NORTH, SOUTH, or empty/null to clear it
+    if (has(b, "area")) {
+      const v = b.area;
+      if (v === null || v === "") data.area = null;
+      else if (typeof v !== "string" || !Object.values(CebuArea).includes(v as CebuArea)) errors.push("Area must be North Cebu, South Cebu or empty");
+      else data.area = v as CebuArea;
+    }
+  }
 
   oneOf("listingType", "Listing type", Object.values(ListingType), !partial);
   oneOf("propertyType", "Property type", Object.values(PropertyType), !partial);

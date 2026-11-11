@@ -1,5 +1,56 @@
 # HANDOFF — Cebu Properties by MCT (Marie Chris L. Tagsip, REB, REA)
 
+## CHANGE-02 — Cascading Cebu location selector in Admin Add/Edit Property (2026-11-11; real deploy NOT done; barangay data NOT yet verified against the official PSA file)
+Scope: the location fields of the admin Add/Edit Property form and the backend/database support they need. Public site, search, filters, cards, detail pages, auth, image upload and every non-location field are untouched. No git repo existed in the upload, so no commit was made.
+
+### What changed
+Backend (`backend/`)
+- `prisma/schema.prisma`: Property gains optional `region`, `cityCode`, `barangay`, `barangayCode`, `subdivision`. `city`, `area`, `address` are kept (`address` = the optional street address).
+- `prisma/migrations/20261111000000_add_property_structured_location/migration.sql`: additive only (5 nullable columns). Nothing dropped or renamed.
+- `data/cebu-regions.json`: the 4 website regions and their localities (listed by NAME; see "Still open" #2).
+- `data/cebu-locations.json`: GENERATED. 4 regions, 53 localities, 1,203 barangays with PSGC codes. Publication recorded as "2026-06-30 (2Q 2026)".
+- `scripts/build-cebu-locations.mjs` + `npm run locations:build`: rebuilds the file from two independent PSGC npm packages (dev deps `@ianlabicani/geoph-lite`, `@aivangogh/ph-address`) and fails, writing nothing, if they disagree on any code or name, if a locality has no barangays, or if the count is not 53. Deduped by PSGC code, never by name.
+- `src/locations.ts` (new): loads the directory once at startup; `resolveLocation()` checks region -> city -> barangay belong to each other; legacy city matching; read-only endpoints.
+- `src/propertyInput.ts`, `src/admin.ts`: structured validation. `city` / `area` are filled by the server from the directory (whatever the browser sends for them is ignored). `/api/admin/locations/*` is mounted under the existing admin auth. A plain `city`/`area` PATCH is refused on listings that already have codes.
+Frontend (`frontend/`)
+- `components/admin/SearchableSelect.tsx` (new), `components/admin/LocationSelector.tsx` (new, used by BOTH Add and Edit through `PropertyForm.tsx`), `components/admin/PropertyForm.tsx` (old "Area of Cebu" select and manual City input removed, location block replaced), `lib/admin-api.ts` (types).
+
+### API
+All admin-only (`/api/admin/locations/...`): `GET regions`, `GET localities?region=KEY`, `GET barangays?city=PSGC`, `GET match?city=TEXT` (pre-fills older listings). Property responses keep their old shape and gain `region`, `cityCode`, `barangay`, `barangayCode`, `subdivision`.
+
+### Decisions
+- Regions are website browsing categories, not official ones. Region/city/barangay data is a versioned JSON file read at startup, NOT new DB tables: it is read-only, changes only with each quarterly PSGC release, and needs no reference-data migration. Updating it is a code change (rebuild + redeploy).
+- `area` (NORTH/SOUTH) is derived from the region so the public North/South filter keeps working. West/Central and Metro localities get `area = null` (no legacy equivalent; public code not changed). Those are: Aloguinsan, Asturias, Balamban, Pinamungajan, Tabuelan, Toledo City, Cebu City, Mandaue City, Lapu-Lapu City, Cordova.
+- Old listings are never rewritten automatically. The Edit form pre-fills region + city by matching the old city text and saves a location only if the admin changes it.
+- Live listings need region + city + barangay; Drafts may have none, but a started location must be complete.
+- Cascade: changing Region resets City and Barangay; changing City resets Barangay; child dropdowns are disabled until the parent is chosen; lists are cached per parent.
+
+### Verified (2026-11-11, sandbox)
+- Locality count 53 (21 North, 22 South, 6 West/Central, 4 Metro); the region lists match the spec names exactly and in order. Barangays: 451 North, 456 South, 146 West/Central, 150 Metro = 1,203.
+- `npm run locations:build` is deterministic: a rebuild is byte-identical to the shipped file.
+- Server validation (called `parsePropertyInput` directly): valid South and Metro saves OK (Metro `area` = null); "Carcar City is not in North Cebu" (400); a Bogo barangay under Carcar -> "Choose a barangay that belongs to Carcar City" (400); bogus region and bogus city code rejected; region/city/barangay must be sent together; a client-supplied `city: "Manila"`, `area: "NORTH"` is overwritten by the directory values; sending all three as null clears the location.
+- Backend `tsc` clean (Prisma client generated with `PRISMA_SCHEMA_ENGINE_BINARY=/bin/true`). Frontend `next lint` and `tsc` clean.
+- Public code read only: it reads `city` and `area` only (`backend/src/properties.ts` filters, `GET /api/properties/locations`; `frontend/lib/search.ts`, `lib/public-api.ts`).
+
+### NOT verified
+- `next build`: fails in the sandbox ONLY because Google Fonts cannot be fetched (not a code error). Run it once on Vercel or locally.
+- The migration against a real Postgres, and the HTTP endpoints / admin screens in a browser (the form was only type-checked and linted, plus the validation calls above).
+- Barangay data against the official PSA file (psa.gov.ph is blocked from the sandbox).
+
+### Still open (needs a decision from Zee)
+1. PSGC SOURCE. The barangay data comes from two community npm packages that both state PSA's 30 June 2026 PSGC; they agree on every code and name. The spec says to use only the official PSA publication and to stop and ask for the file if it cannot be downloaded. Either attach the official PSGC `.xlsx` (the import script gets repointed, the data rebuilt and diffed) or explicitly accept the two-package data.
+2. REGION MAPPING is keyed by locality name in `cebu-regions.json` (resolved to PSGC codes at build time). The spec wants it keyed by PSGC code. To do.
+3. BACKFILL is not done as the spec describes (exact name match, unmatched listed). Currently there is no write: the Edit form does a normalised on-the-fly match ("Carcar" -> "Carcar City"). A dry-run-by-default backfill script (exact match only) still has to be written and run against the real DB; its matched/unmatched list is the report the spec asks for.
+4. PUBLIC CITY FILTER: it matches `city` text exactly, and the dropdown lists distinct `city` values. A re-saved listing becomes "Carcar City" while an old one still says "Carcar", so both can appear. Public code was left untouched as instructed.
+5. The public site does not show barangay/subdivision and its filters do not offer West/Central or Metro. Left alone on purpose.
+
+### To do on deploy
+1. `cd backend && npm install && npx prisma migrate deploy` (then `npx prisma generate`).
+2. Redeploy the backend (it needs the `data/` folder) and the frontend.
+3. Test in /admin: add a listing in each of the 4 regions, edit an old listing (note shows how its city was read), try changing region and confirm city/barangay reset.
+
+---
+
 ## After Phase 13 — Frontend moved to Next.js 14.2.35 (requested by Zee, 2026-11-07, to match the Zee Zafra Properties project)
 Versions now (`frontend/package.json`): next 14.2.35 (exact), react/react-dom ^18.3.1, tailwindcss ^3.4.7 + postcss + autoprefixer, typescript ^5.5.4, eslint ^8.57 + eslint-config-next 14.2.35, sonner ^2.0.7. Before: Next 16.4.3, React 19.3.0, Tailwind 4. The backend is untouched. `package-lock.json` was regenerated.
 Changes (all in `frontend/`):

@@ -1,0 +1,33 @@
+{
+  "_note": "The four website browsing regions and the localities in each. These are NOT official administrative classifications. This file is the ONLY place to edit when a locality moves between regions; then run `npm run locations:build`.",
+  "regions": [
+    {
+      "key": "NORTH_CEBU",
+      "label": "North Cebu",
+      "localities": [
+        "Bantayan", "Bogo City", "Borbon", "Carmen", "Catmon", "Compostela", "Consolacion", "Daanbantayan",
+        "Danao City", "Liloan", "Madridejos", "Medellin", "Pilar", "Poro", "San Francisco", "San Remigio",
+        "Santa Fe", "Sogod", "Tabogon", "Tuburan", "Tudela"
+      ]
+    },
+    {
+      "key": "SOUTH_CEBU",
+      "label": "South Cebu",
+      "localities": [
+        "Alcantara", "Alcoy", "Alegria", "Argao", "Badian", "Barili", "Boljoon", "Carcar City", "Dalaguete",
+        "Dumanjug", "Ginatilan", "Malabuyoc", "Minglanilla", "Moalboal", "Naga City", "Oslob", "Ronda",
+        "Samboan", "San Fernando", "Santander", "Sibonga", "Talisay City"
+      ]
+    },
+    {
+      "key": "WEST_CENTRAL_CEBU",
+      "label": "West / Central Cebu",
+      "localities": ["Aloguinsan", "Asturias", "Balamban", "Pinamungajan", "Tabuelan", "Toledo City"]
+    },
+    {
+      "key": "METRO_CEBU_MACTAN",
+      "label": "Metro Cebu & Mactan",
+      "localities": ["Cebu City", "Mandaue City", "Lapu-Lapu City", "Cordova"]
+    }
+  ]
+}

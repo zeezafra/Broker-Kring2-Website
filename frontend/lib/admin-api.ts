@@ -15,9 +15,16 @@ export type AdminProperty = {
   status: PropertyStatus;
   price: number;
   city: string | null;
-  /** North or South Cebu, chosen by the admin; null when not set. */
+  /** North or South Cebu. Filled in by the server from the chosen region; null for other regions or old listings. */
   area: CebuArea | null;
+  /** Street address (free text). */
   address: string | null;
+  /** CHANGE-02 structured location. All null on listings saved before the location selector existed. */
+  region: string | null;
+  cityCode: string | null;
+  barangay: string | null;
+  barangayCode: string | null;
+  subdivision: string | null;
   bedrooms: number | null;
   bathrooms: number | null;
   floorAreaSqm: number | null;
@@ -70,6 +77,12 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   if (!res.ok) throw new ApiError(body?.error ?? `Something went wrong (${res.status})`, res.status);
   return body as T;
 }
+
+// ---- CHANGE-02: Cebu location directory (served by /api/admin/locations/*) ----
+
+export type LocationRegion = { key: string; label: string; localityCount: number };
+export type LocationCity = { code: string; name: string; type: "city" | "municipality" };
+export type LocationBarangay = { code: string; name: string };
 
 export const peso = (n: number) => `₱${n.toLocaleString("en-PH")}`;
 

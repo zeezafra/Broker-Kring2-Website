@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   ApiError,
   adminFetch,
-  AREA_LABELS,
   type AdminProperty,
-  type CebuArea,
   type ListingType,
   LISTING_TYPE_LABELS,
   type PropertyStatus,
@@ -17,6 +15,7 @@ import {
   PROPERTY_TYPE_LABELS,
   STATUS_LABELS,
 } from "@/lib/admin-api";
+import LocationSelector, { type LocationErrors } from "./LocationSelector";
 
 const MAX_IMAGES = 12;
 const MAX_FILE_MB = 10;
@@ -48,9 +47,13 @@ type FormState = {
   propertyType: PropertyType;
   status: PropertyStatus;
   price: string;
-  city: string;
-  area: CebuArea | "";
-  address: string;
+  // Location (CHANGE-02): codes from the directory. `city` / `area` are no longer typed in; the server fills
+  // them from these.
+  region: string;
+  cityCode: string;
+  barangayCode: string;
+  address: string; // street address
+  subdivision: string;
   bedrooms: string;
   bathrooms: string;
   floorAreaSqm: string;
@@ -68,9 +71,11 @@ function toState(p?: AdminProperty): FormState {
     propertyType: p?.propertyType ?? "HOUSE_AND_LOT",
     status: p?.status ?? "DRAFT",
     price: p ? String(p.price) : "",
-    city: p?.city ?? "",
-    area: p?.area ?? "",
+    region: p?.region ?? "",
+    cityCode: p?.cityCode ?? "",
+    barangayCode: p?.barangayCode ?? "",
     address: p?.address ?? "",
+    subdivision: p?.subdivision ?? "",
     bedrooms: p?.bedrooms != null ? String(p.bedrooms) : "",
     bathrooms: p?.bathrooms != null ? String(p.bathrooms) : "",
     floorAreaSqm: p?.floorAreaSqm != null ? String(p.floorAreaSqm) : "",
@@ -89,6 +94,36 @@ export default function PropertyForm({ initial }: { initial?: AdminProperty }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Location bookkeeping. Listings saved before the selector existed have no codes, only free-text `city`.
+  //  - structured: the listing already has a region, so its location is always sent and kept complete.
+  //  - touched: the admin changed the location fields; until then an older listing's location is left exactly as saved.
+  const structured = Boolean(initial?.region);
+  const [locTouched, setLocTouched] = useState(false);
+  const [locErrors, setLocErrors] = useState<LocationErrors>({});
+  const [legacyNote, setLegacyNote] = useState<string | null>(null);
+
+  // Older listing: try to pre-fill region and city from its saved city text (nothing is guessed; no match = no pre-fill).
+  useEffect(() => {
+    if (!initial || initial.region || !initial.city?.trim()) return;
+    let alive = true;
+    const saved = initial.city.trim();
+    adminFetch<{ data: { region: string; cityCode: string } | null }>(`/api/admin/locations/match?city=${encodeURIComponent(saved)}`)
+      .then((r) => {
+        if (!alive) return;
+        if (r.data) {
+          const m = r.data;
+          setF((s) => (s.region || s.cityCode ? s : { ...s, region: m.region, cityCode: m.cityCode }));
+          setLegacyNote(`This listing was saved with the city “${saved}”. We matched it to the list; choose the barangay to complete the location, or leave this section alone to keep it as saved.`);
+        } else {
+          setLegacyNote(`This listing was saved with the city “${saved}”, which is not in the list. Choose a region, city and barangay to replace it, or leave this section alone to keep it as saved.`);
+        }
+      })
+      .catch(() => alive && setLegacyNote(`This listing was saved with the city “${saved}”. Leave this section alone to keep it as saved.`));
+    return () => {
+      alive = false;
+    };
+  }, [initial]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setF((s) => ({ ...s, [key]: value }));
 
@@ -134,10 +169,38 @@ export default function PropertyForm({ initial }: { initial?: AdminProperty }) {
     });
   }
 
+  // Decides whether the location is sent with this save and which of region / city / barangay is missing.
+  //  - New listings and listings that already have a structured location always send it.
+  //  - An older listing's location is only sent once the admin has changed it; otherwise it stays exactly as saved.
+  //  - When sent, it must be complete, except that a Draft with nothing chosen may have no location at all.
+  function checkLocation(): { errors: LocationErrors; send: boolean } {
+    const send = !initial || structured || locTouched;
+    const anyChosen = Boolean(f.region || f.cityCode || f.barangayCode);
+    const required = anyChosen || (f.status !== "DRAFT" && (!initial || structured));
+    const errors: LocationErrors = {};
+    if (send && required) {
+      if (!f.region) errors.region = "Choose a region";
+      if (!f.cityCode) errors.city = f.region ? "Choose a city or municipality" : "Choose a region first";
+      if (!f.barangayCode) errors.barangay = f.cityCode ? "Choose a barangay" : "Choose a city or municipality first";
+    }
+    return { errors, send };
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (saving || uploading) return;
     setError(null);
+
+    const loc = checkLocation();
+    setLocErrors(loc.errors);
+    const firstBad = (["region", "city", "barangay"] as const).find((k) => loc.errors[k]);
+    if (firstBad) {
+      const msg = "Choose the region, city or municipality and barangay for this listing.";
+      setError(msg);
+      toast.error(msg);
+      document.getElementById(firstBad)?.focus();
+      return;
+    }
 
     const payload = {
       title: f.title,
@@ -146,9 +209,10 @@ export default function PropertyForm({ initial }: { initial?: AdminProperty }) {
       propertyType: f.propertyType,
       status: f.status,
       price: num(f.price),
-      city: f.city,
-      area: f.area === "" ? null : f.area,
+      // city and area are set by the server from the codes below.
+      ...(loc.send ? { region: f.region || null, cityCode: f.cityCode || null, barangayCode: f.barangayCode || null } : {}),
       address: f.address,
+      subdivision: f.subdivision,
       bedrooms: num(f.bedrooms),
       bathrooms: num(f.bathrooms),
       floorAreaSqm: num(f.floorAreaSqm),
@@ -221,22 +285,25 @@ export default function PropertyForm({ initial }: { initial?: AdminProperty }) {
       <section className="rounded-2xl bg-white p-6 shadow-card">
         <h2 className="font-serif text-2xl font-semibold">Location and size</h2>
         <div className="grid gap-x-5 sm:grid-cols-2">
-          <div className="form-field">
-            <label htmlFor="city">City</label>
-            <input id="city" value={f.city} onChange={(e) => set("city", e.target.value)} maxLength={120} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="area">Area of Cebu</label>
-            <select id="area" className={selectClass} value={f.area} onChange={(e) => set("area", e.target.value as CebuArea | "")}>
-              <option value="">Not set (e.g. Cebu City)</option>
-              {Object.entries(AREA_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-            <p className="mt-1 text-xs text-muted">Pick the half of Cebu this property is in, e.g. Carcar is South Cebu. Visitors can then search by North or South.</p>
-          </div>
-          <div className="form-field sm:col-span-2">
-            <label htmlFor="address">Address</label>
-            <input id="address" value={f.address} onChange={(e) => set("address", e.target.value)} maxLength={200} />
-          </div>
+          <LocationSelector
+            value={{ region: f.region, cityCode: f.cityCode, barangayCode: f.barangayCode }}
+            onChange={(v) => {
+              setLocTouched(true);
+              setLocErrors({});
+              setF((s) => ({ ...s, ...v }));
+            }}
+            street={f.address}
+            onStreet={(v) => set("address", v)}
+            subdivision={f.subdivision}
+            onSubdivision={(v) => set("subdivision", v)}
+            errors={locErrors}
+            legacyNote={locTouched ? null : legacyNote}
+            onClear={() => {
+              setLocTouched(true);
+              setLocErrors({});
+              setF((s) => ({ ...s, region: "", cityCode: "", barangayCode: "" }));
+            }}
+          />
           <div className="form-field">
             <label htmlFor="bedrooms">Bedrooms</label>
             <input id="bedrooms" type="number" min="0" max="99" step="1" value={f.bedrooms} onChange={(e) => set("bedrooms", e.target.value)} />

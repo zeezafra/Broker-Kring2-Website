@@ -9,7 +9,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "locations:build": "node scripts/build-cebu-locations.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
@@ -25,6 +26,8 @@
     "typescript": "^7.0.2"
   },
   "devDependencies": {
+    "@aivangogh/ph-address": "^2026.2.4",
+    "@ianlabicani/geoph-lite": "^2.0.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

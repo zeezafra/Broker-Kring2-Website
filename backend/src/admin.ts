@@ -4,6 +4,7 @@ import { Router } from "express";
 import { InquiryStatus, InquiryType, PropertyStatus } from "./generated/prisma/enums";
 import { checkOrigin, requireAdmin } from "./auth";
 import { prisma } from "./db";
+import { locationsRouter } from "./locations";
 import { parsePropertyInput } from "./propertyInput";
 import { toPublic } from "./properties";
 
@@ -14,6 +15,9 @@ adminRouter.use(requireAdmin);
 adminRouter.use((req: Request, res: Response, next: NextFunction) =>
   req.method === "GET" || req.method === "HEAD" ? next() : checkOrigin(req, res, next),
 );
+
+// Region / city / barangay lists for the listing form (read-only, admin login required).
+adminRouter.use("/locations", locationsRouter);
 
 function parseId(value: unknown): number | null {
   if (typeof value !== "string" || !/^\d+$/.test(value)) return null;
@@ -92,6 +96,15 @@ adminRouter.patch("/properties/:id", async (req, res) => {
 
   const parsed = parsePropertyInput(req.body, true);
   if (!parsed.ok) return res.status(400).json({ error: parsed.errors[0], errors: parsed.errors });
+
+  // A listing that already has a structured location can only change it through the selector; a plain
+  // `city` / `area` edit would leave the stored codes pointing somewhere else.
+  const sentStructured = ["region", "cityCode", "barangayCode"].some((k) => k in (req.body ?? {}));
+  const sentLegacy = ["city", "area"].some((k) => k in (req.body ?? {}));
+  if (existing.region && sentLegacy && !sentStructured) {
+    const msg = "This listing uses the location selector. Change region, city and barangay together instead of the city alone.";
+    return res.status(400).json({ error: msg, errors: [msg] });
+  }
 
   const finalStatus = parsed.data.status ?? existing.status;
   const finalImages = parsed.data.images ?? existing.images;
