@@ -1,19 +1,43 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { FormEvent } from "react";
-import { AREA_OPTIONS, areaValue, heroHref, PRICE_BANDS, TYPE_OPTIONS } from "@/lib/search";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { AREA_OPTIONS, heroHref, PRICE_BANDS, TYPE_OPTIONS, type AreaSlug } from "@/lib/search";
+import LocationPicker from "./LocationPicker";
 
 // Phase 8: the search bar now opens /properties with the chosen filters in the URL.
-// Locations: North/South Cebu (fixed) plus the listings' cities (passed in by HeroSection); types and price bands from lib/search.ts.
-export default function Hero({ locations }: { locations: string[] }) {
+// Location: clicking it opens a small panel with Region, then City / Municipality (see LocationPicker).
+// Types and price bands come from lib/search.ts.
+export default function Hero() {
   const router = useRouter();
+  const [area, setArea] = useState<AreaSlug | "">("");
+  const [city, setCity] = useState("");
+  const [open, setOpen] = useState(false);
+  const locRef = useRef<HTMLDivElement>(null);
+
+  // Close the panel on a click outside it or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (locRef.current && !locRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const regionLabel = AREA_OPTIONS.find((a) => a.slug === area)?.label ?? "";
+  const locationLabel = [regionLabel, city].filter(Boolean).join(" · ") || "Location";
 
   function onSearch(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const get = (name: string) => String(data.get(name) ?? "");
-    router.push(heroHref({ location: get("location"), type: get("type"), band: get("price") }));
+    router.push(heroHref({ area, city, type: get("type"), band: get("price") }));
   }
 
   return (
@@ -28,31 +52,35 @@ export default function Hero({ locations }: { locations: string[] }) {
         <div className="accent"></div>
       </div>
       <form className="searchbar" id="searchForm" onSubmit={onSearch}>
-        <label className="search-field">
+        <div className="search-field loc-field" ref={locRef}>
           <svg viewBox="0 0 24 24">
             <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
             <circle cx="12" cy="10" r="2.5" />
           </svg>
-          <select name="location" aria-label="Location" defaultValue="">
-            <option value="">Location</option>
-            <optgroup label="Area">
-              {AREA_OPTIONS.map((a) => (
-                <option key={a.slug} value={areaValue(a.slug)}>
-                  {a.label}
-                </option>
-              ))}
-            </optgroup>
-            {locations.length > 0 && (
-              <optgroup label="City">
-                {locations.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </label>
+          <button type="button" className="loc-trigger" aria-haspopup="dialog" aria-expanded={open} aria-label="Location" onClick={() => setOpen((o) => !o)}>
+            <span>{locationLabel}</span>
+            <svg className="loc-chevron" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+          {open && (
+            <div className="loc-panel" role="dialog" aria-label="Choose a location">
+              <h3>Find your next property</h3>
+              <LocationPicker
+                idPrefix="hero"
+                area={area}
+                city={city}
+                onChange={(next) => {
+                  setArea(next.area);
+                  setCity(next.city);
+                }}
+              />
+              <button type="button" className="gold-btn loc-done" onClick={() => setOpen(false)}>
+                Done
+              </button>
+            </div>
+          )}
+        </div>
         <label className="search-field">
           <svg viewBox="0 0 24 24">
             <path d="M3 11 12 3l9 8v10H3z" />

@@ -484,3 +484,12 @@ body{overflow-x:clip}
 
 /* Tailwind 4 -> 3 parity: v4 draws placeholders as the text colour at 50%; v3 uses a fixed light grey. */
 input::placeholder,textarea::placeholder{opacity:1;color:color-mix(in srgb,currentColor 50%,transparent)}
+
+/* Public Location panel (CHANGE-02c): hero Location opens Region + City / Municipality. */
+.loc-field{position:relative}
+.loc-trigger{flex:1;min-width:0;height:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:0;background:transparent;color:#555;text-align:left;padding:0;font-size:inherit}
+.loc-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-field .loc-chevron{width:16px;height:16px;stroke:#77766f}
+.loc-panel{position:absolute;top:calc(100% + 14px);left:-8px;z-index:5;width:min(360px,calc(100vw - 40px));display:grid;gap:14px;padding:18px;background:#fff;color:var(--color-ink);border-radius:20px;box-shadow:0 18px 40px rgba(30,24,16,.2);white-space:normal}
+.loc-panel h3{margin:0;font:600 20px var(--font-serif)}
+.searchbar .loc-done{min-width:0;width:100%;height:44px;margin-top:0;padding:0 20px}

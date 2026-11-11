@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { CebuArea } from "./generated/prisma/enums";
 
 // The Cebu location directory (region -> city/municipality -> barangay, with official PSGC codes).
@@ -20,6 +20,8 @@ type Directory = {
 const directory: Directory = JSON.parse(fs.readFileSync(new URL("../data/cebu-locations.json", import.meta.url), "utf8"));
 
 const regionByKey = new Map(directory.regions.map((r) => [r.key, r]));
+// Region keys, for the public listing filter (GET /api/properties?region=...).
+export const REGION_KEYS: string[] = directory.regions.map((r) => r.key);
 const localityByCode = new Map(directory.localities.map((l) => [l.code, l]));
 const barangayNames = new Map<string, Map<string, string>>(
   Object.entries(directory.barangays).map(([localityCode, rows]) => [localityCode, new Map(rows)]),
@@ -91,8 +93,8 @@ locationsRouter.get("/regions", (_req, res) => {
   });
 });
 
-// GET /api/admin/locations/localities?region=SOUTH_CEBU
-locationsRouter.get("/localities", (req, res) => {
+// GET /api/admin/locations/localities?region=SOUTH_CEBU   (also public: GET /api/locations/localities, see below)
+const localitiesHandler: RequestHandler = (req, res) => {
   const region = typeof req.query.region === "string" ? regionByKey.get(req.query.region) : undefined;
   if (!region) return res.status(400).json({ error: "region must be one of the listed regions" });
   const data = region.localityCodes
@@ -100,7 +102,13 @@ locationsRouter.get("/localities", (req, res) => {
     .map((l) => ({ code: l.code, name: l.name, type: l.type }))
     .sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
   res.json({ data });
-});
+};
+locationsRouter.get("/localities", localitiesHandler);
+
+// Public, read-only, mounted at /api/locations: the cities and municipalities of a region, for the Location
+// panel on the public search. It is the same reference data the admin form uses (no listings, no personal data).
+export const publicLocationsRouter = Router();
+publicLocationsRouter.get("/localities", localitiesHandler);
 
 // GET /api/admin/locations/barangays?city=0702250000
 locationsRouter.get("/barangays", (req, res) => {

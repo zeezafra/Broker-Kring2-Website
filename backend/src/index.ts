@@ -6,6 +6,7 @@ import { authRouter } from "./auth";
 import { allowedOrigins, checkEnvironment, isProduction } from "./config";
 import { prisma } from "./db";
 import { inquiriesRouter } from "./inquiries";
+import { publicLocationsRouter } from "./locations";
 import { propertiesRouter } from "./properties";
 
 const app = express();
@@ -52,6 +53,7 @@ app.get("/api/health", async (_req, res) => {
 });
 
 app.use("/api/properties", propertiesRouter);
+app.use("/api/locations", publicLocationsRouter);
 app.use("/api/inquiries", inquiriesRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);

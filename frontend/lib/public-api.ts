@@ -72,22 +72,6 @@ export async function getProperties(state: SearchState): Promise<ListResult> {
   }
 }
 
-// Phase 8: Location dropdown options come from the cities the listings really use. Never throws;
-// on any failure the dropdowns simply have no city options.
-export async function getLocations(): Promise<string[]> {
-  try {
-    const res = await fetch(`${API_BASE}/api/properties/locations`, {
-      next: { revalidate: 60 },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) return [];
-    const body = (await res.json()) as { data?: unknown };
-    return Array.isArray(body.data) ? body.data.filter((c): c is string => typeof c === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 // notFound distinguishes "this listing does not exist (or is a draft)" from "the API is unreachable".
 export type PropertyResult = { ok: true; data: ApiProperty } | { ok: false; notFound: boolean };
 

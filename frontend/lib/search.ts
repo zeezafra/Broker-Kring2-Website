@@ -5,9 +5,9 @@
 export type ListingFilter = "all" | "buy" | "rent";
 export type SortKey = "newest" | "price-asc" | "price-desc";
 export type TypeSlug = "house-and-lot" | "condominium" | "townhouse" | "commercial" | "lot";
-export type AreaSlug = "north" | "south";
+export type AreaSlug = "north" | "south" | "west-central" | "metro";
 
-// Location options are NOT defined here: they come from the listings' cities (GET /api/properties/locations).
+// Cities are NOT defined here: the Location panel loads them per region (GET /api/locations/localities).
 // Property types are a fixed list from the HTML dropdown; the broker still has to confirm it.
 export const TYPE_OPTIONS: { slug: TypeSlug; value: string; label: string }[] = [
   { slug: "house-and-lot", value: "HOUSE_AND_LOT", label: "House & Lot" },
@@ -17,28 +17,15 @@ export const TYPE_OPTIONS: { slug: TypeSlug; value: string; label: string }[] = 
   { slug: "lot", value: "LOT", label: "Lot" },
 ];
 
-// North / South Cebu. Which half a listing belongs to is chosen by the admin on each listing (nothing is
-// guessed from the city name), so these two options are fixed and always shown in the Location dropdowns.
-export const AREA_OPTIONS: { slug: AreaSlug; value: "NORTH" | "SOUTH"; label: string }[] = [
-  { slug: "north", value: "NORTH", label: "North Cebu" },
-  { slug: "south", value: "SOUTH", label: "South Cebu" },
+// The four Cebu regions from the admin's location selector (website browsing categories, not official ones).
+// `value` is the region key the API filters on (GET /api/properties?region=...). They are fixed and always
+// shown in the Location dropdowns. The URL still uses the short slug, so old ?area=north links keep working.
+export const AREA_OPTIONS: { slug: AreaSlug; value: string; label: string }[] = [
+  { slug: "north", value: "NORTH_CEBU", label: "North Cebu" },
+  { slug: "south", value: "SOUTH_CEBU", label: "South Cebu" },
+  { slug: "west-central", value: "WEST_CENTRAL_CEBU", label: "West / Central Cebu" },
+  { slug: "metro", value: "METRO_CEBU_MACTAN", label: "Metro Cebu & Mactan" },
 ];
-
-// The Location dropdowns (hero + /properties) hold ONE value: an area ("area:north") or a city name.
-const AREA_PREFIX = "area:";
-export const areaValue = (slug: AreaSlug) => `${AREA_PREFIX}${slug}`;
-
-export function locationValue(s: { area: AreaSlug | ""; city: string }): string {
-  return s.area ? areaValue(s.area) : s.city;
-}
-
-export function splitLocation(value: string): { area: AreaSlug | ""; city: string } {
-  if (value.startsWith(AREA_PREFIX)) {
-    const found = AREA_OPTIONS.find((a) => a.slug === value.slice(AREA_PREFIX.length));
-    return { area: found ? found.slug : "", city: "" };
-  }
-  return { area: "", city: value };
-}
 
 // The hero's "Price Range" bands. They are purchase-price bands, so choosing one from the hero also
 // switches the results to Buy (see heroHref); otherwise "Below ₱5M" would list every rental.
@@ -133,8 +120,8 @@ export function parseSearch(sp: RawParams): SearchState {
   return {
     listing: listingRaw === "buy" || listingRaw === "rent" ? listingRaw : "all",
     q: first(sp.q).replace(/\s+/g, " ").trim().slice(0, 100),
-    // An area replaces a city (the dropdown holds one or the other), so a link with both uses the area.
-    city: area ? "" : first(sp.city).replace(/\s+/g, " ").trim().slice(0, 60),
+    // Region and city can be combined (the Location panel has a Region dropdown and a City dropdown).
+    city: first(sp.city).replace(/\s+/g, " ").trim().slice(0, 60),
     area,
     type: TYPE_OPTIONS.some((t) => t.slug === typeRaw) ? (typeRaw as TypeSlug) : "",
     minPrice,
@@ -169,7 +156,7 @@ export function hasActiveFilters(s: SearchState): boolean {
 }
 
 export function filterCount(s: SearchState): number {
-  return [s.q, s.city, s.area, s.type, s.minPrice, s.maxPrice, s.beds].filter((v) => v !== "" && v !== null).length;
+  return [s.q, s.area || s.city, s.type, s.minPrice, s.maxPrice, s.beds].filter((v) => v !== "" && v !== null).length;
 }
 
 // Query string for the backend API (GET /api/properties).
@@ -180,7 +167,7 @@ export function toApiParams(s: SearchState, pageSize: number): URLSearchParams {
   if (s.q) qs.set("q", s.q);
   if (s.city) qs.set("city", s.city);
   const area = AREA_OPTIONS.find((a) => a.slug === s.area);
-  if (area) qs.set("area", area.value);
+  if (area) qs.set("region", area.value);
   const type = TYPE_OPTIONS.find((t) => t.slug === s.type);
   if (type) qs.set("propertyType", type.value);
   if (s.minPrice !== null) qs.set("minPrice", String(s.minPrice));
@@ -191,13 +178,14 @@ export function toApiParams(s: SearchState, pageSize: number): URLSearchParams {
   return qs;
 }
 
-// Where the hero search bar sends the visitor.
-// `location` is the Location dropdown value: an area ("area:south") or a city name.
-export function heroHref(v: { location: string; type: string; band: string }): string {
+// Where the hero search bar sends the visitor. `area` is a region slug and `city` a city or municipality name
+// (both from the Location panel).
+export function heroHref(v: { area: AreaSlug | ""; city: string; type: string; band: string }): string {
   const band = PRICE_BANDS.find((b) => b.key === v.band);
   return buildHref({
     listing: band ? "buy" : "all",
-    ...splitLocation(v.location),
+    area: v.area,
+    city: v.city,
     type: TYPE_OPTIONS.some((t) => t.slug === v.type) ? (v.type as TypeSlug) : "",
     minPrice: band?.min ?? null,
     maxPrice: band?.max ?? null,

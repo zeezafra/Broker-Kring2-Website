@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import PropertyFilters from "@/components/PropertyFilters";
 import { PropertyCard, PropertyCardSkeletons } from "@/components/PropertyCard";
 import SiteShell from "@/components/SiteShell";
-import { getLocations, getProperties, PAGE_SIZE } from "@/lib/public-api";
+import { getProperties, PAGE_SIZE } from "@/lib/public-api";
 import {
   buildHref,
   hasActiveFilters,
@@ -78,7 +78,7 @@ async function Listings({ searchParams }: { searchParams: SearchParams }) {
   const state = parseSearch(searchParams);
   const { listing, page } = state;
   const filtered = hasActiveFilters(state);
-  const [result, locations] = await Promise.all([getProperties(state), getLocations()]);
+  const result = await getProperties(state);
 
   const totalPages = result.ok ? Math.max(1, Math.ceil(result.total / PAGE_SIZE)) : 1;
   const chips = activeChips(state);
@@ -109,7 +109,7 @@ async function Listings({ searchParams }: { searchParams: SearchParams }) {
       </PageHead>
 
       {/* key = the URL, so the form fields reset when the URL changes (Back button, chips, Clear all). */}
-      <PropertyFilters key={buildHref({ ...state, page: 1 })} state={state} locations={locations} />
+      <PropertyFilters key={buildHref({ ...state, page: 1 })} state={state} />
 
       {chips.length > 0 && (
         <div className="filter-chips" aria-label="Active filters">

@@ -4,35 +4,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import {
-  AREA_OPTIONS,
-  areaValue,
   BEDROOM_OPTIONS,
   bandsFor,
   buildHref,
   filterCount,
   hasActiveFilters,
-  locationValue,
   matchBand,
   parseSearch,
   priceLabel,
   SORT_OPTIONS,
-  splitLocation,
   TYPE_OPTIONS,
+  type AreaSlug,
   type SearchState,
   type SortKey,
 } from "@/lib/search";
+import LocationPicker from "./LocationPicker";
 
 // Search box + filters + sort for /properties. Every change goes into the URL (see lib/search.ts), so a
 // filtered view can be shared, bookmarked and reached with the Back button. The page re-fetches on navigation.
 // The Buy/Rent tabs live in the page, not here; the current tab is kept when filters change.
-export default function PropertyFilters({ state, locations }: { state: SearchState; locations: string[] }) {
+export default function PropertyFilters({ state }: { state: SearchState }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false); // filter panel, small screens only
 
   const [q, setQ] = useState(state.q);
-  // One dropdown holds an area ("area:south") or a city name; see lib/search.ts.
-  const [location, setLocation] = useState(locationValue(state));
+  // Region and city are two linked dropdowns (LocationPicker).
+  const [area, setArea] = useState<AreaSlug | "">(state.area);
+  const [city, setCity] = useState(state.city);
   const [type, setType] = useState<string>(state.type);
   const [beds, setBeds] = useState(state.beds === null ? "" : String(state.beds));
   // One "Price range" dropdown. Value is a band key, "" for any price, or "custom" when the URL carries a
@@ -43,19 +42,14 @@ export default function PropertyFilters({ state, locations }: { state: SearchSta
   const [price, setPrice] = useState(!hasPrice ? "" : matched ? matched.key : "custom");
   const [sort, setSort] = useState<SortKey>(state.sort);
 
-  // A city typed into the URL that is not one of the dropdown options still has to show as selected.
-  const cityOptions =
-    state.city && !locations.some((c) => c.toLowerCase() === state.city.toLowerCase()) ? [state.city, ...locations] : locations;
-
   function apply(sortOverride?: SortKey) {
     // parseSearch cleans the typed values the same way the page will (digits only, min/max swapped if reversed).
     const band = bands.find((b) => b.key === price);
     const keepCustom = price === "custom";
-    const loc = splitLocation(location);
     const clean = parseSearch({
       q,
-      city: loc.city,
-      area: loc.area,
+      city,
+      area,
       type,
       beds,
       minPrice: String(band?.min ?? (keepCustom ? state.minPrice : null) ?? ""),
@@ -131,28 +125,15 @@ export default function PropertyFilters({ state, locations }: { state: SearchSta
             ))}
           </select>
         </label>
-        <label className="filter-field">
-          Location
-          <select name="location" value={location} onChange={(e) => setLocation(e.target.value)}>
-            <option value="">All locations</option>
-            <optgroup label="Area">
-              {AREA_OPTIONS.map((a) => (
-                <option key={a.slug} value={areaValue(a.slug)}>
-                  {a.label}
-                </option>
-              ))}
-            </optgroup>
-            {cityOptions.length > 0 && (
-              <optgroup label="City">
-                {cityOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </label>
+        <LocationPicker
+          idPrefix="filters"
+          area={area}
+          city={city}
+          onChange={(next) => {
+            setArea(next.area);
+            setCity(next.city);
+          }}
+        />
         <label className="filter-field">
           Bedrooms
           <select name="beds" value={beds} onChange={(e) => setBeds(e.target.value)}>

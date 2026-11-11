@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Prisma, Property } from "./generated/prisma/client";
 import { CebuArea, ListingType, PropertyType } from "./generated/prisma/enums";
 import { prisma } from "./db";
+import { REGION_KEYS } from "./locations";
 
 export const propertiesRouter = Router();
 
@@ -44,14 +45,16 @@ function orderFor(sort: Sort): Prisma.PropertyOrderByWithRelationInput[] {
 //   Phase 8 search + filters (all optional, combined with AND):
 //   q=words (each word must appear in title, city, address or description)
 //   city=Cebu City (matches the city exactly, or appears in the address; case-insensitive)
-//   area=NORTH|SOUTH (the admin-chosen half of Cebu)
+//   area=NORTH|SOUTH (the admin-chosen half of Cebu; kept so old links keep working)
+//   region=NORTH_CEBU|SOUTH_CEBU|WEST_CENTRAL_CEBU|METRO_CEBU_MACTAN (the admin's location regions; North and
+//   South also match older listings that only have the North/South area set)
 //   propertyType=HOUSE_AND_LOT|CONDOMINIUM|TOWNHOUSE|COMMERCIAL|LOT
 //   minPrice=pesos  maxPrice=pesos (inclusive; for RENT listings the price is the monthly rent)
 //   minBedrooms=1..9 (listings with no bedroom count never match)
 //   sort=newest (default)|price_asc|price_desc
 // Public: never returns DRAFT listings.
 propertiesRouter.get("/", async (req, res) => {
-  const { listingType, featured, propertyType, area } = req.query;
+  const { listingType, featured, propertyType, area, region } = req.query;
 
   if (listingType !== undefined && !Object.values(ListingType).includes(listingType as ListingType)) {
     return res.status(400).json({ error: "listingType must be SALE or RENT" });
@@ -64,6 +67,9 @@ propertiesRouter.get("/", async (req, res) => {
   }
   if (area !== undefined && !Object.values(CebuArea).includes(area as CebuArea)) {
     return res.status(400).json({ error: "area must be NORTH or SOUTH" });
+  }
+  if (region !== undefined && (typeof region !== "string" || !REGION_KEYS.includes(region))) {
+    return res.status(400).json({ error: `region must be one of ${REGION_KEYS.join(", ")}` });
   }
   const limit = parseIntParam(req.query.limit, DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = parseIntParam(req.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
@@ -113,6 +119,13 @@ propertiesRouter.get("/", async (req, res) => {
         { address: { contains: escapeLike(cityTerm), mode: "insensitive" } },
       ],
     });
+  }
+
+  // Older listings have only `area` (NORTH/SOUTH) and no `region`, so North and South also match on `area`.
+  const regionArea: Record<string, CebuArea> = { NORTH_CEBU: CebuArea.NORTH, SOUTH_CEBU: CebuArea.SOUTH };
+  if (typeof region === "string") {
+    const legacy = regionArea[region];
+    and.push({ OR: [{ region }, ...(legacy ? [{ region: null, area: legacy }] : [])] });
   }
 
   const where: Prisma.PropertyWhereInput = {
